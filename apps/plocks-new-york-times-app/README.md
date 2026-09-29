@@ -1,12 +1,12 @@
-# plocks Times-style news
+# The Daily Edition
 
-An editorial news reader with sections, article detail, and a saved list. Stories are original sample content; no live feed.
+An original editorial news reader example built with Plocks. It includes a lead story, section feeds, search, full article reading views, saved stories, read history, and clearly labeled fictional ad placements. The stories, bylines, sponsors, and artwork are sample content; no live news feed or ad network is connected.
 
-This standalone Expo example uses `@plocks/ui` components through the shared [`ExampleUI.tsx`](../example-common/ExampleUI.tsx) layout and a light or dark `PlocksProvider` theme. Its main interaction lives in [`App.tsx`](./App.tsx).
+The app uses `@plocks/ui` for typography and icons, React Native for layout, and AsyncStorage for saved and read state. Its main interaction lives in [`App.tsx`](./App.tsx).
 
 ## Run
 
-From the `plocks` repository root:
+From the `plocks-example-apps` repository root:
 
 ```bash
 npm install

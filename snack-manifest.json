@@ -214,11 +214,18 @@
   {
     "slug": "new-york-times",
     "codeFiles": [
-      "App.tsx",
-      "ExampleUI.tsx"
+      "App.tsx"
     ],
-    "assets": [],
-    "dependencies": []
+    "assets": [
+      "assets/scene-city.webp",
+      "assets/scene-desert.webp",
+      "assets/scene-forest.webp",
+      "assets/scene-lake.webp",
+      "assets/scene-ocean.webp"
+    ],
+    "dependencies": [
+      "@react-native-async-storage/async-storage"
+    ]
   },
   {
     "slug": "npr",
