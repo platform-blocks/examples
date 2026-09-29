@@ -1,0 +1,12 @@
+{
+  "name": "plocks-example-apps",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/plocks-*-app"
+  ],
+  "scripts": {
+    "snack:generate": "node scripts/generate-snacks.mjs",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  }
+}

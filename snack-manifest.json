@@ -1,0 +1,299 @@
+[
+  {
+    "slug": "baseball-live",
+    "codeFiles": [
+      "App.tsx",
+      "data.ts",
+      "theme.ts",
+      "ExampleUI.tsx"
+    ],
+    "assets": [],
+    "dependencies": []
+  },
+  {
+    "slug": "bible",
+    "codeFiles": [
+      "App.tsx",
+      "ExampleUI.tsx"
+    ],
+    "assets": [],
+    "dependencies": []
+  },
+  {
+    "slug": "calculator",
+    "codeFiles": [
+      "App.tsx",
+      "ExampleUI.tsx"
+    ],
+    "assets": [],
+    "dependencies": []
+  },
+  {
+    "slug": "chatgpt",
+    "codeFiles": [
+      "App.tsx"
+    ],
+    "assets": [],
+    "dependencies": [
+      "@react-native-async-storage/async-storage"
+    ]
+  },
+  {
+    "slug": "craigslist",
+    "codeFiles": [
+      "App.tsx"
+    ],
+    "assets": [],
+    "dependencies": [
+      "@react-native-async-storage/async-storage"
+    ]
+  },
+  {
+    "slug": "dicom-viewer",
+    "codeFiles": [
+      "App.tsx",
+      "dicom.ts",
+      "ExampleUI.tsx"
+    ],
+    "assets": [],
+    "dependencies": [
+      "expo-document-picker",
+      "expo-file-system"
+    ]
+  },
+  {
+    "slug": "discord",
+    "codeFiles": [
+      "App.tsx"
+    ],
+    "assets": [],
+    "dependencies": [
+      "@react-native-async-storage/async-storage"
+    ]
+  },
+  {
+    "slug": "doodle-jump",
+    "codeFiles": [
+      "App.tsx",
+      "ExampleUI.tsx"
+    ],
+    "assets": [],
+    "dependencies": []
+  },
+  {
+    "slug": "duolingo",
+    "codeFiles": [
+      "App.tsx",
+      "ExampleUI.tsx"
+    ],
+    "assets": [],
+    "dependencies": []
+  },
+  {
+    "slug": "fanduel",
+    "codeFiles": [
+      "App.tsx"
+    ],
+    "assets": [],
+    "dependencies": [
+      "@react-native-async-storage/async-storage"
+    ]
+  },
+  {
+    "slug": "fish-dating",
+    "codeFiles": [
+      "App.tsx"
+    ],
+    "assets": [],
+    "dependencies": [
+      "@react-native-async-storage/async-storage",
+      "expo-linear-gradient"
+    ]
+  },
+  {
+    "slug": "fitbit",
+    "codeFiles": [
+      "App.tsx",
+      "ExampleUI.tsx"
+    ],
+    "assets": [],
+    "dependencies": []
+  },
+  {
+    "slug": "flappy-bird",
+    "codeFiles": [
+      "App.tsx",
+      "ExampleUI.tsx"
+    ],
+    "assets": [],
+    "dependencies": []
+  },
+  {
+    "slug": "flight-tracker",
+    "codeFiles": [
+      "App.tsx",
+      "ExampleUI.tsx"
+    ],
+    "assets": [],
+    "dependencies": []
+  },
+  {
+    "slug": "gmail",
+    "codeFiles": [
+      "App.tsx"
+    ],
+    "assets": [],
+    "dependencies": [
+      "@react-native-async-storage/async-storage"
+    ]
+  },
+  {
+    "slug": "instagram",
+    "codeFiles": [
+      "App.tsx"
+    ],
+    "assets": [
+      "assets/scene-city.webp",
+      "assets/scene-desert.webp",
+      "assets/scene-forest.webp",
+      "assets/scene-lake.webp",
+      "assets/scene-ocean.webp"
+    ],
+    "dependencies": [
+      "@react-native-async-storage/async-storage"
+    ]
+  },
+  {
+    "slug": "music",
+    "codeFiles": [
+      "App.tsx",
+      "catalog.ts"
+    ],
+    "assets": [
+      "assets/audio/afterglow.mp3",
+      "assets/audio/blue-apartment.mp3",
+      "assets/audio/golden-hour.mp3",
+      "assets/audio/night-drive.mp3",
+      "assets/audio/side-streets.mp3",
+      "assets/audio/soft-focus.mp3"
+    ],
+    "dependencies": [
+      "@plocks/carousel@0.1.0",
+      "@react-native-async-storage/async-storage",
+      "expo-audio"
+    ]
+  },
+  {
+    "slug": "netflix",
+    "codeFiles": [
+      "App.tsx"
+    ],
+    "assets": [
+      "assets/scene-city.webp",
+      "assets/scene-desert.webp",
+      "assets/scene-forest.webp",
+      "assets/scene-lake.webp",
+      "assets/scene-ocean.webp"
+    ],
+    "dependencies": [
+      "@react-native-async-storage/async-storage",
+      "expo-linear-gradient"
+    ]
+  },
+  {
+    "slug": "new-york-times",
+    "codeFiles": [
+      "App.tsx",
+      "ExampleUI.tsx"
+    ],
+    "assets": [],
+    "dependencies": []
+  },
+  {
+    "slug": "npr",
+    "codeFiles": [
+      "App.tsx",
+      "ExampleUI.tsx"
+    ],
+    "assets": [],
+    "dependencies": []
+  },
+  {
+    "slug": "pinterest",
+    "codeFiles": [
+      "App.tsx",
+      "ExampleUI.tsx"
+    ],
+    "assets": [],
+    "dependencies": []
+  },
+  {
+    "slug": "reddit",
+    "codeFiles": [
+      "App.tsx"
+    ],
+    "assets": [],
+    "dependencies": [
+      "@react-native-async-storage/async-storage"
+    ]
+  },
+  {
+    "slug": "robinhood",
+    "codeFiles": [
+      "App.tsx"
+    ],
+    "assets": [],
+    "dependencies": [
+      "@react-native-async-storage/async-storage"
+    ]
+  },
+  {
+    "slug": "solitaire",
+    "codeFiles": [
+      "App.tsx",
+      "game.ts"
+    ],
+    "assets": [],
+    "dependencies": []
+  },
+  {
+    "slug": "tiktok-shop",
+    "codeFiles": [
+      "App.tsx"
+    ],
+    "assets": [],
+    "dependencies": [
+      "@react-native-async-storage/async-storage",
+      "expo-linear-gradient"
+    ]
+  },
+  {
+    "slug": "weather",
+    "codeFiles": [
+      "App.tsx",
+      "weather.ts"
+    ],
+    "assets": [],
+    "dependencies": []
+  },
+  {
+    "slug": "whatsapp",
+    "codeFiles": [
+      "App.tsx",
+      "data.ts"
+    ],
+    "assets": [],
+    "dependencies": [
+      "@react-native-async-storage/async-storage"
+    ]
+  },
+  {
+    "slug": "wordle",
+    "codeFiles": [
+      "App.tsx",
+      "ExampleUI.tsx"
+    ],
+    "assets": [],
+    "dependencies": []
+  }
+]

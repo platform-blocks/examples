@@ -1,0 +1,41 @@
+{
+  "name": "@plocks/dicom-viewer-app",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start",
+    "web": "expo start --web",
+    "ios": "expo run:ios",
+    "android": "expo run:android",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@plocks/ui": "file:../../../plocks/packages/ui",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-masked-view/masked-view": "^0.3.2",
+    "@shopify/flash-list": "2.3.1",
+    "@tabler/icons-react-native": "^3.46.0",
+    "expo": "~57.0.8",
+    "expo-clipboard": "~57.0.0",
+    "expo-document-picker": "~57.0.0",
+    "expo-haptics": "~57.0.0",
+    "expo-linear-gradient": "~57.0.0",
+    "expo-navigation-bar": "~57.0.0",
+    "expo-status-bar": "~57.0.0",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-gesture-handler": "~2.32.0",
+    "react-native-reanimated": "4.5.0",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-svg": "15.15.4",
+    "react-native-web": "~0.21.0",
+    "react-native-worklets": "0.10.0",
+    "expo-file-system": "~57.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.2",
+    "typescript": "~6.0.3"
+  }
+}
