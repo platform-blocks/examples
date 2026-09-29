@@ -6,6 +6,10 @@
   },
   "include": [
     "App.tsx",
-    "../example-common/ExampleUI.tsx"
+    "theme.ts",
+    "data.ts",
+    "components/**/*.tsx",
+    "screens/**/*.tsx",
+    "game/**/*.ts"
   ]
 }

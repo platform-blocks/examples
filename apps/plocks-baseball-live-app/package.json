@@ -8,7 +8,8 @@
     "web": "expo start --web",
     "ios": "expo run:ios",
     "android": "expo run:android",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --test tests/*.test.mjs"
   },
   "dependencies": {
     "@plocks/ui": "file:../../../plocks/packages/ui",

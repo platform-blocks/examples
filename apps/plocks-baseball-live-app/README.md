@@ -1,8 +1,14 @@
-# plocks Baseball live visualizer
+# Diamond Game Day
 
-A simulated pitch-by-pitch baseball board with inning, count, bases, and score. No live league feed.
+A standalone Expo baseball example built with Platform Blocks components. It shows a fictional league with three app views:
 
-This standalone Expo example uses `@plocks/ui` components through the shared [`ExampleUI.tsx`](../example-common/ExampleUI.tsx) layout and a light or dark `PlocksProvider` theme. Its main interaction lives in [`App.tsx`](./App.tsx).
+- **Scores** — a live demo matchup alongside sample final and upcoming games.
+- **Gamecast** — a field visualizer, pitch-by-pitch play log, and inning box score. Tap **Next pitch** to advance the simulation; **Reset simulation** restores the seventh-inning starting point.
+- **Standings** — sample Coast and Inland division tables.
+
+The UI uses `PlocksProvider`, `AppShell`, `Block`, `Card`, `Row`, `Column`, `SegmentedControl`, `Scroller`, `Button`, `Badge`, `Divider`, `Text`, and `Title` from `@plocks/ui`. The app does not render React Native UI primitives directly.
+
+The files are organized by responsibility: [`App.tsx`](./App.tsx) wires navigation and state, [`screens/`](./screens) contains the views, [`components/`](./components) holds reusable baseball UI, and [`game/engine.ts`](./game/engine.ts) handles the simulation rules. Teams and schedules in [`data.ts`](./data.ts) are fictional. There is no live sports feed.
 
 ## Run
 
@@ -13,4 +19,4 @@ npm install
 npm run web -w @plocks/baseball-live-app
 ```
 
-Use `npm run start -w @plocks/baseball-live-app` for Expo, or `npm run typecheck -w @plocks/baseball-live-app` to check TypeScript.
+Use `npm run start -w @plocks/baseball-live-app` for Expo. Run `npm run typecheck -w @plocks/baseball-live-app` and `npm run test -w @plocks/baseball-live-app` to verify the app and game rules.

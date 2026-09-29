@@ -35,7 +35,7 @@ export default function App() {
       <Text c={P.ink} size={48} ta="right" numberOfLines={1}>{display}</Text></Panel>
     {keys.map((row, index) => <View key={index} style={{ flexDirection: 'row', gap: 8 }}>
       {row.map(key => <View key={key} style={{ flex: key === '0' ? 2 : 1 }}><Button title={key} onPress={() => press(key)}
-        color={'+−×÷='.includes(key) ? P.accent : P.surface} textColor={P.ink} variant="filled" style={{ width: '100%', height: 60 }} /></View>)}
+        color={'+−×÷='.includes(key) ? P.accent : P.surface} textColor={P.ink} variant="filled" fullWidth style={{ height: 60 }} /></View>)}
     </View>)}
   </ExampleApp>;
 }

@@ -3,11 +3,19 @@
     "slug": "baseball-live",
     "codeFiles": [
       "App.tsx",
+      "components/CountDisplay.tsx",
+      "components/FieldDiamond.tsx",
+      "components/FixtureCard.tsx",
+      "components/Panel.tsx",
+      "components/Scoreboard.tsx",
+      "components/TeamMark.tsx",
       "data.ts",
       "game/engine.ts",
       "game/types.ts",
-      "theme.ts",
-      "ExampleUI.tsx"
+      "screens/GamecastScreen.tsx",
+      "screens/ScoresScreen.tsx",
+      "screens/StandingsScreen.tsx",
+      "theme.ts"
     ],
     "assets": [],
     "dependencies": []

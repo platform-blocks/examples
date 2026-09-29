@@ -7,15 +7,15 @@ export function createGame(): GameState {
   return {
     inning: 7, half: 'top', status: 'live', away: 3, home: 2,
     hits: { away: 7, home: 5 }, errors: { away: 0, home: 1 },
-    innings: { away: [1, 0, 0, 2, 0, 0, 0, 0, 0], home: [0, 1, 0, 0, 1, 0, 0, 0, 0] },
+    innings: { away: [1, 0, 0, 2, 0, 0, 0], home: [0, 1, 0, 0, 1, 0] },
     balls: 1, strikes: 1, outs: 1, bases: [false, true, false],
     batter: { away: 3, home: 4 }, pitchCount: 95,
     events: [{ id: 95, inning: 7, half: 'top', title: 'Game in progress', detail: 'Hawks have a runner on second with one out.', away: 3, home: 2 }],
   };
 }
 
-function log(game: GameState, title: string, detail: string): GameState {
-  const event: PlayEvent = { id: game.pitchCount, inning: game.inning, half: game.half, title, detail, away: game.away, home: game.home };
+function log(game: GameState, title: string, detail: string, occurrence?: Pick<GameState, 'inning' | 'half'>): GameState {
+  const event: PlayEvent = { id: game.pitchCount, inning: occurrence?.inning ?? game.inning, half: occurrence?.half ?? game.half, title, detail, away: game.away, home: game.home };
   return { ...game, events: [event, ...game.events].slice(0, 80) };
 }
 
@@ -65,10 +65,15 @@ function out(game: GameState, title: string): GameState {
   if (game.outs < 2) return log({ ...game, outs: game.outs + 1, balls: 0, strikes: 0, batter: nextBatter(game, side) }, title, `${game.outs + 1} out${game.outs ? 's' : ''} in the inning.`);
   const afterTop = game.half === 'top';
   const final = afterTop ? game.inning >= 9 && game.home > game.away : game.inning >= 9 && game.home !== game.away;
+  const nextInning = afterTop || final ? game.inning : game.inning + 1;
+  const nextSide: Side = afterTop ? 'home' : 'away';
+  const nextLine = [...game.innings[nextSide]];
+  if (!final) while (nextLine.length < nextInning) nextLine.push(0);
   return log({ ...game, status: final ? 'final' : 'live', inning: afterTop || final ? game.inning : game.inning + 1,
     half: final ? game.half : afterTop ? 'bottom' : 'top', outs: 0, balls: 0, strikes: 0,
-    bases: [false, false, false], batter: nextBatter(game, side) }, title,
-    final ? 'Side retired. The game is final.' : `Side retired. ${afterTop ? 'Bottom' : 'Top'} of the ${afterTop ? game.inning : game.inning + 1}${ordinal(afterTop ? game.inning : game.inning + 1)} is next.`);
+    bases: [false, false, false], batter: nextBatter(game, side),
+    innings: final ? game.innings : { ...game.innings, [nextSide]: nextLine } }, title,
+    final ? 'Side retired. The game is final.' : `Side retired. ${afterTop ? 'Bottom' : 'Top'} of the ${afterTop ? game.inning : game.inning + 1}${ordinal(afterTop ? game.inning : game.inning + 1)} is next.`, game);
 }
 
 function ordinal(n: number): string { return n % 100 >= 11 && n % 100 <= 13 ? 'th' : n % 10 === 1 ? 'st' : n % 10 === 2 ? 'nd' : n % 10 === 3 ? 'rd' : 'th'; }
