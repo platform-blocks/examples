@@ -4,6 +4,8 @@
     "codeFiles": [
       "App.tsx",
       "data.ts",
+      "game/engine.ts",
+      "game/types.ts",
       "theme.ts",
       "ExampleUI.tsx"
     ],

@@ -11,8 +11,20 @@ const MANIFEST = path.join(ROOT, 'snack-manifest.json');
 const SHARED_UI = path.join(APPS, 'example-common/ExampleUI.tsx');
 const VERSION = '0.1.0';
 
+function sourceFiles(dir, base = '') {
+  return fs.readdirSync(path.join(dir, base), { withFileTypes: true }).flatMap(entry => {
+    const name = path.posix.join(base, entry.name);
+    if (entry.isDirectory()) return ['node_modules', '.expo', 'assets'].includes(entry.name) ? [] : sourceFiles(dir, name);
+    return /\.tsx?$/.test(name) && name !== 'index.ts' && !name.endsWith('.d.ts') ? [name] : [];
+  });
+}
+
 function packageImports(code) {
   return [...code.matchAll(/(?:from\s*|import\s*)['"]([^'".][^'"]*)['"]/g)].map(match => match[1]);
+}
+
+function relativeImports(code) {
+  return [...code.matchAll(/from\s*['"](\.{1,2}\/[^'"]+)['"]/g)].map(match => match[1]);
 }
 
 function snackSource(code) {
@@ -34,8 +46,7 @@ for (const directory of fs.readdirSync(APPS).filter(name => /^plocks-.+-app$/.te
   }
   const outputDir = path.join(OUTPUT, slug);
   fs.mkdirSync(outputDir, { recursive: true });
-  const codeFiles = fs.readdirSync(sourceDir)
-    .filter(name => /\.tsx?$/.test(name) && name !== 'index.ts' && !name.endsWith('.d.ts'))
+  const codeFiles = sourceFiles(sourceDir)
     .sort((a, b) => a === 'App.tsx' ? -1 : b === 'App.tsx' ? 1 : a.localeCompare(b));
   const sources = codeFiles.map(name => ({ name, code: fs.readFileSync(path.join(sourceDir, name), 'utf8') }));
   if (sources.some(file => file.code.includes('../example-common/ExampleUI'))) {
@@ -45,9 +56,12 @@ for (const directory of fs.readdirSync(APPS).filter(name => /^plocks-.+-app$/.te
 
   const dependencies = new Set();
   const assets = new Set();
+  const knownModules = new Set(codeFiles.map(name => name.replace(/\.(tsx?|jsx?)$/, '')));
   for (const file of sources) {
     const rewritten = snackSource(file.code);
-    fs.writeFileSync(path.join(outputDir, file.name), rewritten);
+    const to = path.join(outputDir, file.name);
+    fs.mkdirSync(path.dirname(to), { recursive: true });
+    fs.writeFileSync(to, rewritten);
     for (const imported of packageImports(rewritten)) {
       if (imported.startsWith('@plocks/') && imported !== '@plocks/ui-snack') {
         dependencies.add(`${imported}@${VERSION}`);
@@ -55,8 +69,14 @@ for (const directory of fs.readdirSync(APPS).filter(name => /^plocks-.+-app$/.te
         dependencies.add(imported);
       }
     }
+    for (const imported of relativeImports(rewritten)) {
+      const resolved = path.posix.normalize(path.posix.join(path.posix.dirname(file.name), imported)).replace(/\.(tsx?|jsx?)$/, '');
+      if (!knownModules.has(resolved) && !knownModules.has(`${resolved}/index`)) {
+        throw new Error(`${directory}/${file.name}: missing Snack source ${imported}`);
+      }
+    }
     for (const match of rewritten.matchAll(/require\s*\(\s*['"](\.\/assets\/[^'"]+)['"]\s*\)/g)) {
-      const asset = match[1].slice(2);
+      const asset = path.posix.normalize(path.posix.join(path.posix.dirname(file.name), match[1]));
       const from = path.join(sourceDir, asset);
       if (!fs.existsSync(from)) throw new Error(`Missing asset: ${directory}/${asset}`);
       const to = path.join(outputDir, asset);
