@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { ImageBackground, Pressable, ScrollView, StatusBar, TextInput, View, useWindowDimensions } from 'react-native';
+import { ImageBackground, Linking, Pressable, ScrollView, StatusBar, TextInput, View, useWindowDimensions } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { Button, Icon, IconButton, PlocksProvider, Text } from '@plocks/ui';
+import { Avatar, Button, Icon, IconButton, Marquee, PlocksProvider, Text } from '@plocks/ui';
+import { Video, type VideoState } from '@plocks/media';
 
 const C = { black: '#0D0D0D', panel: '#171717', white: '#FFF', muted: '#B8B8B8', red: '#E50914', line: '#292929' };
 const ART = [
@@ -21,6 +22,26 @@ const FILMS = [
   { id: 'wildwood', title: 'Wildwood', genre: 'Family', year: '2025', rating: 'TV-PG', length: '1h 27m', art: 0, caption: 'A summer to remember.', synopsis: 'Four siblings discover their favorite campsite has one last surprise.' },
   { id: 'mirage', title: 'Mirage', genre: 'Sci-Fi', year: '2026', rating: 'TV-14', length: '1h 56m', art: 2, caption: 'What you see is only the start.', synopsis: 'A strange signal brings a research team to the edge of the desert.' },
 ];
+// The catalog and cast are fictional. These are clearly credited sample clips,
+// played through the plocks YouTube player rather than presented as film trailers.
+const CLIPS = [
+  { id: 'WhWc3b3KhnY', title: 'Spring', creator: 'Blender Studio' },
+  { id: 'OHOpb2fS-cM', title: 'Tears of Steel', creator: 'Blender' },
+  { id: 'aqz-KE-bpKQ', title: 'Big Buck Bunny', creator: 'Blender' },
+  { id: 'WhWc3b3KhnY', title: 'Spring', creator: 'Blender Studio' },
+  { id: '_cMxraX_5RE', title: 'Sprite Fright', creator: 'Blender Studio' },
+] as const;
+const CAST: Record<string, string[]> = {
+  evergreen: ['Ava Morgan', 'Elliot Hayes', 'Mina Brooks', 'Leo Carter'],
+  afterdark: ['Nora Vale', 'Julian Cross', 'Iris Chen', 'Marcus Reed'],
+  goldenhour: ['Sofia Reyes', 'Caleb Ward', 'Amara Bell', 'Jonah Wells'],
+  stillwater: ['Elena Park', 'Samir Shah', 'Tessa Cole', 'Micah Ford'],
+  deepblue: ['Kai Bennett', 'Lena Ortiz', 'Owen Blake', 'Dara Quinn'],
+  nightshift: ['Riley James', 'Theo Martin', 'Zoe Patel', 'Miles Grant'],
+  wildwood: ['Piper Lane', 'Finn Walker', 'June Ellis', 'Arlo Stone'],
+  mirage: ['Maya Chen', 'Isaac Holt', 'Nadia Cole', 'Evan Price'],
+};
+const CAST_COLORS = ['#663BA1', '#AF484E', '#2C777B', '#9A6B2C'];
 type Film = typeof FILMS[number];
 type Tab = 'home' | 'search' | 'list';
 const STORAGE = 'plocks-netflix-example:v1';
@@ -45,7 +66,7 @@ function NightfallScreen() {
   const [progress, setProgress] = useState<Record<string, number>>({ wildwood: 0.42, nightshift: 0.19 });
   const [selected, setSelected] = useState<string | null>(null);
   const [playing, setPlaying] = useState<string | null>(null);
-  const [paused, setPaused] = useState(false);
+  const [videoError, setVideoError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const film = FILMS.find((item) => item.id === selected);
   const current = FILMS.find((item) => item.id === playing);
@@ -62,16 +83,7 @@ function NightfallScreen() {
   useEffect(() => {
     if (ready) AsyncStorage.setItem(STORAGE, JSON.stringify({ myList, progress })).catch(() => {});
   }, [myList, progress, ready]);
-  useEffect(() => {
-    if (!playing || paused) return;
-    const timer = setInterval(() => setProgress((old) => {
-      const next = Math.min(1, (old[playing] ?? 0) + 0.005);
-      if (next >= 1) setPaused(true);
-      return { ...old, [playing]: next };
-    }), 500);
-    return () => clearInterval(timer);
-  }, [playing, paused]);
-  const openPlayer = (id: string) => { setSelected(null); setPlaying(id); setPaused(false); };
+  const openPlayer = (id: string) => { setSelected(null); setPlaying(id); setVideoError(null); };
   const toggleList = (id: string) => setMyList((old) => old.includes(id) ? old.filter((item) => item !== id) : [...old, id]);
   const nav = <View style={{ flexDirection: 'row', gap: wide ? 29 : 18, alignItems: 'center' }}>
     {([['home', 'Home'], ['search', 'Search'], ['list', 'My List']] as const).map(([item, label]) => <Pressable key={item}
@@ -151,10 +163,20 @@ function NightfallScreen() {
             <Text c="#6FD092" fw="bold" size={13}>98% match  <Text c={C.muted} size={12}>{film.year} · {film.rating} · {film.length}</Text></Text>
             <Text c={C.white} size={15} style={{ lineHeight: 23 }}>{film.synopsis}</Text>
             <Text c={C.muted} size={12}>{film.genre} · Nightfall Original</Text>
+            <View style={{ gap: 10, marginTop: 4 }}>
+              <Text c={C.white} fw="bold" size={17}>Cast</Text>
+              <Marquee duration={23000} gap="lg" pauseOnHover fadeEdgeColor={C.panel}>
+                {CAST[film.id].map((actor, index) => <View key={actor} style={{ width: 102, alignItems: 'center', gap: 6 }}>
+                  <Avatar size={46} fallback={actor.split(' ').map((part) => part[0]).join('')} bg={CAST_COLORS[index % CAST_COLORS.length]}
+                    textColor={C.white} showText={false} accessibilityLabel={actor} />
+                  <Text c={C.white} size={11} numberOfLines={1}>{actor}</Text>
+                </View>)}
+              </Marquee>
+            </View>
             <View style={{ flexDirection: 'row', gap: 10 }}>
-              <Pressable onPress={() => openPlayer(film.id)} accessibilityRole="button" accessibilityLabel={`Play ${film.title} preview`}
+              <Pressable onPress={() => openPlayer(film.id)} accessibilityRole="button" accessibilityLabel={`Play YouTube sample clip for ${film.title}`}
                 style={{ flex: 1, backgroundColor: C.white, borderRadius: 7, padding: 12, alignItems: 'center' }}>
-                <Text c={C.black} fw="bold">▶  Play preview</Text></Pressable>
+                <Text c={C.black} fw="bold">▶  Play sample clip</Text></Pressable>
               <IconButton icon={myList.includes(film.id) ? 'check' : 'plus'} variant="outline" iconColor={C.white}
                 accessibilityLabel={myList.includes(film.id) ? 'Remove from My List' : 'Add to My List'} onPress={() => toggleList(film.id)} />
             </View>
@@ -162,23 +184,29 @@ function NightfallScreen() {
         </ScrollView>
       </View>
     </View>}
-    {!!current && <View style={{ position: 'absolute', inset: 0, backgroundColor: C.black, justifyContent: 'center', alignItems: 'center' }}>
-      <ImageBackground source={ART[current.art]} style={{ width: '100%', flex: 1, justifyContent: 'space-between' }}>
-        <LinearGradient colors={['#000B', 'transparent']} style={{ padding: 20, flexDirection: 'row', alignItems: 'center', gap: 15 }}>
-          <IconButton icon="arrowLeft" variant="ghost" iconColor={C.white} accessibilityLabel="Exit player" onPress={() => { setPlaying(null); setPaused(true); }} />
-          <Text c={C.white} fw="bold" size={19}>{current.title}</Text>
-          <Text c={C.white} size={11} style={{ marginLeft: 'auto' }}>DEMO PREVIEW</Text>
-        </LinearGradient>
-        <Pressable onPress={() => setPaused((old) => !old)} accessibilityRole="button" accessibilityLabel={paused ? 'Resume preview' : 'Pause preview'}
-          style={{ alignSelf: 'center', width: 72, height: 72, borderRadius: 36, backgroundColor: '#0009', alignItems: 'center', justifyContent: 'center' }}>
-          <Icon name={paused ? 'play' : 'pause'} variant="filled" color={C.white} size={37} /></Pressable>
-        <LinearGradient colors={['transparent', '#000D']} style={{ padding: 22, gap: 12 }}>
-          <Text c={C.white} size={12}>{paused ? 'Paused' : 'Playing'} · Simulated preview</Text>
-          <View style={{ height: 5, borderRadius: 3, backgroundColor: '#FFFFFF80', overflow: 'hidden' }}>
-            <View style={{ width: `${Math.round((progress[current.id] ?? 0) * 100)}%`, height: 5, backgroundColor: C.red }} /></View>
-          <Text c={C.white} size={11}>{Math.round((progress[current.id] ?? 0) * 100)}% complete</Text>
-        </LinearGradient>
-      </ImageBackground>
+    {!!current && <View style={{ position: 'absolute', inset: 0, backgroundColor: C.black }}>
+      <View style={{ padding: 18, flexDirection: 'row', alignItems: 'center', gap: 15 }}>
+        <IconButton icon="arrowLeft" variant="ghost" iconColor={C.white} accessibilityLabel="Exit player" onPress={() => setPlaying(null)} />
+        <Text c={C.white} fw="bold" size={19}>{current.title}</Text>
+      </View>
+      <View style={{ flex: 1, width: '100%', maxWidth: 1050, alignSelf: 'center', justifyContent: 'center' }}>
+        <Video key={current.id} source={{ youtube: CLIPS[current.art].id }} w="100%" aspectRatio={16 / 9} autoPlay controls
+          accessibilityLabel={`YouTube sample clip for ${current.title}`}
+          onTimeUpdate={(state: VideoState) => {
+            if (!state.duration) return;
+            const next = Math.min(1, state.currentTime / state.duration);
+            setProgress((old) => Math.abs((old[current.id] ?? 0) - next) >= 0.01 || next === 1
+              ? { ...old, [current.id]: next } : old);
+          }}
+          onError={setVideoError} />
+        <View style={{ padding: 18, gap: 8 }}>
+          <Text c={C.muted} size={12}>YouTube sample clip: {CLIPS[current.art].title} · {CLIPS[current.art].creator}</Text>
+          {videoError && <View style={{ gap: 8 }}>
+            <Text c={C.white} size={12}>This clip could not play here.</Text>
+            <Button title="Open on YouTube" size="sm" onPress={() => Linking.openURL(`https://www.youtube.com/watch?v=${CLIPS[current.art].id}`)} />
+          </View>}
+        </View>
+      </View>
     </View>}
   </SafeAreaView>;
 }

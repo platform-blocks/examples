@@ -1,8 +1,8 @@
 # Nightfall
 
-A Netflix-inspired streaming catalog built with plocks and Expo. Browse titles, search, save a My List, open details, and use a simulated preview player with pause and progress. List and progress are saved locally. The artwork and titles are demo content; no video service is connected.
+A Netflix-inspired streaming catalog built with plocks and Expo. Browse titles, search, save a My List, and open details with a cast marquee. The plocks Video player plays credited sample clips from YouTube; the catalog titles and actors are fictional demo content. List and playback progress are saved locally.
 
-Run from the plocks root:
+Run from the `plocks-example-apps` root, alongside the `plocks` checkout:
 
 ```bash
 npm install
