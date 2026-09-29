@@ -206,6 +206,7 @@
       "assets/scene-ocean.webp"
     ],
     "dependencies": [
+      "@plocks/media@0.1.0",
       "@react-native-async-storage/async-storage",
       "expo-linear-gradient"
     ]
