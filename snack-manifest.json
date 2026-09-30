@@ -21,27 +21,18 @@
     "dependencies": []
   },
   {
-    "slug": "bible",
-    "codeFiles": [
-      "App.tsx",
-      "ExampleUI.tsx"
-    ],
-    "assets": [],
-    "dependencies": []
-  },
-  {
     "slug": "calculator",
     "codeFiles": [
-      "App.tsx",
-      "ExampleUI.tsx"
+      "App.tsx"
     ],
     "assets": [],
     "dependencies": []
   },
   {
-    "slug": "chatgpt",
+    "slug": "chatline",
     "codeFiles": [
-      "App.tsx"
+      "App.tsx",
+      "data.ts"
     ],
     "assets": [],
     "dependencies": [
@@ -49,12 +40,29 @@
     ]
   },
   {
-    "slug": "craigslist",
+    "slug": "daily-edition",
+    "codeFiles": [
+      "App.tsx"
+    ],
+    "assets": [
+      "assets/scene-city.webp",
+      "assets/scene-desert.webp",
+      "assets/scene-forest.webp",
+      "assets/scene-lake.webp",
+      "assets/scene-ocean.webp"
+    ],
+    "dependencies": [
+      "@react-native-async-storage/async-storage"
+    ]
+  },
+  {
+    "slug": "daymark",
     "codeFiles": [
       "App.tsx"
     ],
     "assets": [],
     "dependencies": [
+      "@plocks/charts@0.1.0",
       "@react-native-async-storage/async-storage"
     ]
   },
@@ -62,8 +70,10 @@
     "slug": "dicom-viewer",
     "codeFiles": [
       "App.tsx",
+      "components/ScanViewport.tsx",
       "dicom.ts",
-      "ExampleUI.tsx"
+      "study.ts",
+      "theme.ts"
     ],
     "assets": [],
     "dependencies": [
@@ -72,35 +82,19 @@
     ]
   },
   {
-    "slug": "discord",
+    "slug": "e-reader",
     "codeFiles": [
-      "App.tsx"
+      "App.tsx",
+      "book.ts"
     ],
     "assets": [],
     "dependencies": [
-      "@react-native-async-storage/async-storage"
+      "@react-native-async-storage/async-storage",
+      "expo-speech"
     ]
   },
   {
-    "slug": "doodle-jump",
-    "codeFiles": [
-      "App.tsx",
-      "ExampleUI.tsx"
-    ],
-    "assets": [],
-    "dependencies": []
-  },
-  {
-    "slug": "duolingo",
-    "codeFiles": [
-      "App.tsx",
-      "ExampleUI.tsx"
-    ],
-    "assets": [],
-    "dependencies": []
-  },
-  {
-    "slug": "fanduel",
+    "slug": "fieldhouse",
     "codeFiles": [
       "App.tsx"
     ],
@@ -116,49 +110,27 @@
     ],
     "assets": [],
     "dependencies": [
-      "@react-native-async-storage/async-storage",
-      "expo-linear-gradient"
-    ]
-  },
-  {
-    "slug": "fitbit",
-    "codeFiles": [
-      "App.tsx",
-      "ExampleUI.tsx"
-    ],
-    "assets": [],
-    "dependencies": []
-  },
-  {
-    "slug": "flappy-bird",
-    "codeFiles": [
-      "App.tsx",
-      "ExampleUI.tsx"
-    ],
-    "assets": [],
-    "dependencies": []
-  },
-  {
-    "slug": "flight-tracker",
-    "codeFiles": [
-      "App.tsx",
-      "ExampleUI.tsx"
-    ],
-    "assets": [],
-    "dependencies": []
-  },
-  {
-    "slug": "gmail",
-    "codeFiles": [
-      "App.tsx"
-    ],
-    "assets": [],
-    "dependencies": [
       "@react-native-async-storage/async-storage"
     ]
   },
   {
-    "slug": "instagram",
+    "slug": "flight-tracker",
+    "codeFiles": [
+      "App.tsx"
+    ],
+    "assets": [],
+    "dependencies": []
+  },
+  {
+    "slug": "flutterflight",
+    "codeFiles": [
+      "App.tsx"
+    ],
+    "assets": [],
+    "dependencies": []
+  },
+  {
+    "slug": "frameleaf",
     "codeFiles": [
       "App.tsx"
     ],
@@ -169,6 +141,69 @@
       "assets/scene-lake.webp",
       "assets/scene-ocean.webp"
     ],
+    "dependencies": [
+      "@plocks/carousel@0.1.0",
+      "@react-native-async-storage/async-storage"
+    ]
+  },
+  {
+    "slug": "guildline",
+    "codeFiles": [
+      "App.tsx"
+    ],
+    "assets": [],
+    "dependencies": [
+      "@react-native-async-storage/async-storage"
+    ]
+  },
+  {
+    "slug": "idea-grid",
+    "codeFiles": [
+      "App.tsx"
+    ],
+    "assets": [
+      "assets/pins/balcony-garden.webp",
+      "assets/pins/ceramic-vase.webp",
+      "assets/pins/coffee.webp",
+      "assets/pins/interior.webp",
+      "assets/pins/living-room.webp",
+      "assets/pins/market-flowers.webp",
+      "assets/pins/minimal-flowers.webp",
+      "assets/pins/pottery.webp",
+      "assets/pins/reading-nook.webp",
+      "assets/pins/studio.webp",
+      "assets/pins/table.webp",
+      "assets/pins/workspace.webp"
+    ],
+    "dependencies": [
+      "@react-native-async-storage/async-storage"
+    ]
+  },
+  {
+    "slug": "lettergrid",
+    "codeFiles": [
+      "App.tsx"
+    ],
+    "assets": [],
+    "dependencies": []
+  },
+  {
+    "slug": "loopshop",
+    "codeFiles": [
+      "App.tsx"
+    ],
+    "assets": [],
+    "dependencies": [
+      "@plocks/carousel@0.1.0",
+      "@react-native-async-storage/async-storage"
+    ]
+  },
+  {
+    "slug": "mosaic-chat",
+    "codeFiles": [
+      "App.tsx"
+    ],
+    "assets": [],
     "dependencies": [
       "@react-native-async-storage/async-storage"
     ]
@@ -194,11 +229,12 @@
     ]
   },
   {
-    "slug": "netflix",
+    "slug": "nightfall",
     "codeFiles": [
       "App.tsx"
     ],
     "assets": [
+      "assets/demo-clip.mp4",
       "assets/scene-city.webp",
       "assets/scene-desert.webp",
       "assets/scene-forest.webp",
@@ -208,62 +244,26 @@
     "dependencies": [
       "@plocks/media@0.1.0",
       "@react-native-async-storage/async-storage",
-      "expo-linear-gradient"
+      "expo-asset"
     ]
   },
   {
-    "slug": "new-york-times",
+    "slug": "postbox",
     "codeFiles": [
       "App.tsx"
     ],
-    "assets": [
-      "assets/scene-city.webp",
-      "assets/scene-desert.webp",
-      "assets/scene-forest.webp",
-      "assets/scene-lake.webp",
-      "assets/scene-ocean.webp"
-    ],
+    "assets": [],
     "dependencies": [
       "@react-native-async-storage/async-storage"
     ]
   },
   {
-    "slug": "npr",
+    "slug": "signal-news",
     "codeFiles": [
-      "App.tsx",
-      "ExampleUI.tsx"
+      "App.tsx"
     ],
     "assets": [],
     "dependencies": []
-  },
-  {
-    "slug": "pinterest",
-    "codeFiles": [
-      "App.tsx",
-      "ExampleUI.tsx"
-    ],
-    "assets": [],
-    "dependencies": []
-  },
-  {
-    "slug": "reddit",
-    "codeFiles": [
-      "App.tsx"
-    ],
-    "assets": [],
-    "dependencies": [
-      "@react-native-async-storage/async-storage"
-    ]
-  },
-  {
-    "slug": "robinhood",
-    "codeFiles": [
-      "App.tsx"
-    ],
-    "assets": [],
-    "dependencies": [
-      "@react-native-async-storage/async-storage"
-    ]
   },
   {
     "slug": "solitaire",
@@ -275,14 +275,51 @@
     "dependencies": []
   },
   {
-    "slug": "tiktok-shop",
+    "slug": "springstep",
+    "codeFiles": [
+      "App.tsx"
+    ],
+    "assets": [],
+    "dependencies": []
+  },
+  {
+    "slug": "sproutfolio",
     "codeFiles": [
       "App.tsx"
     ],
     "assets": [],
     "dependencies": [
-      "@react-native-async-storage/async-storage",
-      "expo-linear-gradient"
+      "@plocks/charts@0.1.0",
+      "@react-native-async-storage/async-storage"
+    ]
+  },
+  {
+    "slug": "threadit",
+    "codeFiles": [
+      "App.tsx"
+    ],
+    "assets": [],
+    "dependencies": [
+      "@react-native-async-storage/async-storage"
+    ]
+  },
+  {
+    "slug": "townlist",
+    "codeFiles": [
+      "App.tsx"
+    ],
+    "assets": [
+      "assets/listings/apartment.webp",
+      "assets/listings/balcony.webp",
+      "assets/listings/bicycle.webp",
+      "assets/listings/cafe.webp",
+      "assets/listings/chair-room.webp",
+      "assets/listings/desk.webp",
+      "assets/listings/living-room.webp",
+      "assets/listings/studio.webp"
+    ],
+    "dependencies": [
+      "@react-native-async-storage/async-storage"
     ]
   },
   {
@@ -291,25 +328,19 @@
       "App.tsx",
       "weather.ts"
     ],
-    "assets": [],
-    "dependencies": []
-  },
-  {
-    "slug": "whatsapp",
-    "codeFiles": [
-      "App.tsx",
-      "data.ts"
+    "assets": [
+      "assets/scene-city.webp",
+      "assets/scene-desert.webp",
+      "assets/scene-lake.webp"
     ],
-    "assets": [],
     "dependencies": [
-      "@react-native-async-storage/async-storage"
+      "expo-linear-gradient"
     ]
   },
   {
-    "slug": "wordle",
+    "slug": "wordtrail",
     "codeFiles": [
-      "App.tsx",
-      "ExampleUI.tsx"
+      "App.tsx"
     ],
     "assets": [],
     "dependencies": []

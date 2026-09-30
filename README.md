@@ -1,25 +1,46 @@
-# plocks example apps
+# Examples
 
-Standalone Expo example apps built with [plocks](https://github.com/platform-blocks/plocks). Each app lives in `apps/plocks-*-app`; shared example layout components live in `apps/example-common`.
+Standalone Expo example apps built with [plocks](https://github.com/platform-blocks/plocks). Each app lives in `apps/<slug>`; shared example layout components live in `apps/example-common`.
 
 ## Run locally
 
 The plocks packages have not yet been published to npm. Clone this repository beside the main `plocks` checkout, so the directory layout is:
 
 ```text
-platform-blocks/
+<workspace>/
   plocks/
-  plocks-example-apps/
+  examples/
 ```
 
 Then install dependencies from this repository root and start an app:
 
 ```sh
 npm install
-npm run start -w @plocks/weather-app
+npm run start -w @plocks/weather
 ```
 
 The other app package names are in their respective `package.json` files. The native apps use Expo SDK 57. Once the plocks packages are published, the local `file:` dependencies can be replaced with npm versions.
+
+## Explore web demos
+
+From the sibling `plocks` checkout, run `npm run site:build-with-demos` to build the docs gallery with all 28 live web demos and browsable source pages. Serve `plocks/apps/docs/dist` as a static site; the gallery is at `/examples/`, with each app at `/demos/<app>/` and its source at `/demos/<app>/source.html`.
+
+To export the apps without building the docs, run `npm run web:export -- <output-directory>`. Pass an optional app slug as the second argument to export a single app.
+
+## UI convention
+
+App layouts and controls use plocks components with named props. For example:
+
+```tsx
+<ScrollArea contentProps={{ p: 20, gap: 12 }}>
+  <Block direction="row" align="center" justify="space-between">
+    <Text fw="bold" size={20}>Today</Text>
+    <Button title="Add" onPress={addItem} />
+  </Block>
+</ScrollArea>
+```
+
+Run `npm run validate:ui` to check every app and generated Snack for direct native layout elements or inline style props. The same check runs during `npm run typecheck`.
 
 ## Expo Snack
 

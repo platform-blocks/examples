@@ -1,12 +1,14 @@
 {
-  "name": "plocks-example-apps",
+  "name": "examples",
   "version": "0.1.0",
   "private": true,
   "workspaces": [
-    "apps/plocks-*-app"
+    "apps/*"
   ],
   "scripts": {
     "snack:generate": "node scripts/generate-snacks.mjs",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "web:export": "node scripts/export-web-demos.mjs",
+    "typecheck": "npm run validate:ui && npm run typecheck --workspaces --if-present",
+    "validate:ui": "node scripts/validate-plocks-ui.mjs"
   }
 }

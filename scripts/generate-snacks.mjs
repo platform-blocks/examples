@@ -8,7 +8,6 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const APPS = path.join(ROOT, 'apps');
 const OUTPUT = path.join(ROOT, 'snacks');
 const MANIFEST = path.join(ROOT, 'snack-manifest.json');
-const SHARED_UI = path.join(APPS, 'example-common/ExampleUI.tsx');
 const VERSION = '0.1.0';
 
 function sourceFiles(dir, base = '') {
@@ -28,17 +27,15 @@ function relativeImports(code) {
 }
 
 function snackSource(code) {
-  return code
-    .replace(/(['"])@plocks\/ui\1/g, '$1@plocks/ui-snack$1')
-    .replace(/(['"])\.\.\/example-common\/ExampleUI\1/g, '$1./ExampleUI$1');
+  return code.replace(/(['"])@plocks\/ui\1/g, '$1@plocks/ui-snack$1');
 }
 
 const manifest = [];
 fs.rmSync(OUTPUT, { recursive: true, force: true });
 fs.mkdirSync(OUTPUT, { recursive: true });
 
-for (const directory of fs.readdirSync(APPS).filter(name => /^plocks-.+-app$/.test(name)).sort()) {
-  const slug = directory.slice('plocks-'.length, -'-app'.length);
+for (const directory of fs.readdirSync(APPS).filter(name => fs.existsSync(path.join(APPS, name, 'App.tsx'))).sort()) {
+  const slug = directory;
   const sourceDir = path.join(APPS, directory);
   if (!fs.existsSync(path.join(sourceDir, 'App.tsx'))) {
     console.log(`Skipping ${directory}: App.tsx is not present yet`);
@@ -49,11 +46,6 @@ for (const directory of fs.readdirSync(APPS).filter(name => /^plocks-.+-app$/.te
   const codeFiles = sourceFiles(sourceDir)
     .sort((a, b) => a === 'App.tsx' ? -1 : b === 'App.tsx' ? 1 : a.localeCompare(b));
   const sources = codeFiles.map(name => ({ name, code: fs.readFileSync(path.join(sourceDir, name), 'utf8') }));
-  if (sources.some(file => file.code.includes('../example-common/ExampleUI'))) {
-    codeFiles.push('ExampleUI.tsx');
-    sources.push({ name: 'ExampleUI.tsx', code: fs.readFileSync(SHARED_UI, 'utf8') });
-  }
-
   const dependencies = new Set();
   const assets = new Set();
   const knownModules = new Set(codeFiles.map(name => name.replace(/\.(tsx?|jsx?)$/, '')));

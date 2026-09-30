@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "plocks Flight Tracker",
+    "slug": "flight-tracker",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "experiments": {
+      "baseUrl": "/demos/flight-tracker"
+    }
+  }
+}

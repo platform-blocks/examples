@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ScrollView, StatusBar, useWindowDimensions, type ViewStyle } from 'react-native';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { Button, Card, Column, Flex, PlocksProvider, Row, Text, Title } from '@plocks/ui-snack';
+import { StatusBar, useWindowDimensions } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Block, ScrollArea, SafeArea, Button, Card, Column, Flex, PlocksProvider, Text, Title } from '@plocks/ui-snack';
 
 import {
   SUITS,
@@ -39,7 +39,9 @@ const COLORS = {
 const GAME_THEME = { colorScheme: 'dark' as const };
 
 function formatTime(seconds: number): string {
-  const minutes = Math.floor(seconds / 60).toString().padStart(2, '0');
+  const minutes = Math.floor(seconds / 60)
+    .toString()
+    .padStart(2, '0');
   const remaining = (seconds % 60).toString().padStart(2, '0');
   return `${minutes}:${remaining}`;
 }
@@ -48,8 +50,12 @@ function sourceEquals(left: Source | null, right: Source): boolean {
   if (!left || left.pile !== right.pile) return false;
   if (left.pile === 'waste') return true;
   if (left.pile === 'foundation' && right.pile === 'foundation') return left.suit === right.suit;
-  return left.pile === 'tableau' && right.pile === 'tableau' &&
-    left.column === right.column && left.cardIndex === right.cardIndex;
+  return (
+    left.pile === 'tableau' &&
+    right.pile === 'tableau' &&
+    left.column === right.column &&
+    left.cardIndex === right.cardIndex
+  );
 }
 
 type CardFaceProps = {
@@ -59,11 +65,22 @@ type CardFaceProps = {
   selected?: boolean;
   highlighted?: boolean;
   onPress?: () => void;
-  style?: ViewStyle;
+  top?: number;
+  zIndex?: number;
   accessibilityLabel?: string;
 };
 
-function CardFace({ card, width, height, selected, highlighted, onPress, style, accessibilityLabel }: CardFaceProps) {
+function CardFace({
+  card,
+  width,
+  height,
+  selected,
+  highlighted,
+  onPress,
+  top,
+  zIndex,
+  accessibilityLabel,
+}: CardFaceProps) {
   const red = isRed(card.suit);
   const ink = red ? COLORS.red : COLORS.black;
   const small = width < 60;
@@ -80,39 +97,58 @@ function CardFace({ card, width, height, selected, highlighted, onPress, style, 
       bg={card.faceUp ? COLORS.cream : '#20564A'}
       borderColor={selected || highlighted ? COLORS.gold : card.faceUp ? '#DFD9C8' : '#81A79A'}
       borderWidth={selected ? 3 : highlighted ? 2 : 1}
-      style={[
-        {
-          width,
-          height,
-          overflow: 'hidden',
-          shadowColor: '#031813',
-          shadowOpacity: 0.24,
-          shadowRadius: 9,
-          shadowOffset: { width: 0, height: 4 },
-          elevation: 4,
-        },
-        style,
-      ]}
+      w={width}
+      h={height}
+      clip
+      shadow="md"
+      position={top === undefined ? 'relative' : 'absolute'}
+      top={top}
+      left={top === undefined ? undefined : 0}
+      zIndex={zIndex}
     >
       {card.faceUp ? (
         <>
-          <Column gap={0} style={{ position: 'absolute', top: small ? 3 : 6, left: small ? 4 : 8 }} fullWidth={false}>
-            <Text fw="bold" c={ink} size={rankSize} lh={1}>{rankLabel(card.rank)}</Text>
-            <Text c={ink} size={suitSize} lh={1}>{SUIT_SYMBOL[card.suit]}</Text>
-          </Column>
-          <Flex align="center" justify="center" style={{ flex: 1 }}>
-            <Text c={ink} size={centerSize} lh={1}>{SUIT_SYMBOL[card.suit]}</Text>
-          </Flex>
+          <Block
+            gap={0}
+            direction="column"
+            position="absolute"
+            top={small ? 3 : 6}
+            left={small ? 4 : 8}
+            fullWidth={false}
+          >
+            <Text fw="bold" c={ink} size={rankSize} lh={1}>
+              {rankLabel(card.rank)}
+            </Text>
+            <Text c={ink} size={suitSize} lh={1}>
+              {SUIT_SYMBOL[card.suit]}
+            </Text>
+          </Block>
+          <Block align="center" justify="center" direction="row" flex={1}>
+            <Text c={ink} size={centerSize} lh={1}>
+              {SUIT_SYMBOL[card.suit]}
+            </Text>
+          </Block>
           {!small && (
-            <Text c={ink} size={16} style={{ position: 'absolute', bottom: 5, right: 8 }}>
+            <Text c={ink} size={16} position="absolute" bottom={5} right={8}>
               {SUIT_SYMBOL[card.suit]}
             </Text>
           )}
         </>
       ) : (
-        <Flex align="center" justify="center" style={{ flex: 1, margin: 4, borderWidth: 1, borderColor: '#7FA69A', borderRadius: 6 }}>
-          <Text c={COLORS.gold} size={small ? 21 : 36} lh={1}>✦</Text>
-        </Flex>
+        <Block
+          align="center"
+          justify="center"
+          direction="row"
+          flex={1}
+          m={4}
+          borderWidth={1}
+          borderColor="#7FA69A"
+          radius={6}
+        >
+          <Text c={COLORS.gold} size={small ? 21 : 36} lh={1}>
+            ✦
+          </Text>
+        </Block>
       )}
     </Card>
   );
@@ -142,13 +178,15 @@ function EmptySlot({
       borderColor={highlighted ? COLORS.gold : 'rgba(226, 239, 219, 0.27)'}
       onPress={onPress}
       accessibilityLabel={label}
-      style={{ width, height, borderStyle: 'dashed' }}
+      borderStyle="dashed"
+      w={width}
+      h={height}
     >
-      <Flex align="center" justify="center" style={{ flex: 1 }}>
+      <Block align="center" justify="center" direction="row" flex={1}>
         <Text c={highlighted ? COLORS.gold : 'rgba(226, 239, 219, 0.34)'} size={width < 60 ? 22 : 38}>
           {symbol}
         </Text>
-      </Flex>
+      </Block>
     </Card>
   );
 }
@@ -202,9 +240,11 @@ function SolitaireScreen() {
     const cards = sourceCards(game, source);
     if (!cards) return;
     setSelected(source);
-    setMessage(cards.length > 1
-      ? `${cardLabel(cards[0])} and ${cards.length - 1} more selected. Tap a tableau column.`
-      : `${cardLabel(cards[0])} selected. Tap a valid destination.`);
+    setMessage(
+      cards.length > 1
+        ? `${cardLabel(cards[0])} and ${cards.length - 1} more selected. Tap a tableau column.`
+        : `${cardLabel(cards[0])} selected. Tap a valid destination.`,
+    );
   }
 
   function tapTableau(column: number, cardIndex?: number) {
@@ -255,32 +295,52 @@ function SolitaireScreen() {
     }
   }
 
-  const tableauLayouts = useMemo(() => game.tableau.map((pile) => {
-    let offset = 0;
-    const positions = pile.map((card) => {
-      const position = offset;
-      offset += card.faceUp ? openStep : coveredStep;
-      return position;
-    });
-    return { positions, height: Math.max(cardHeight, (positions.at(-1) ?? 0) + cardHeight) };
-  }), [game.tableau, cardHeight, coveredStep, openStep]);
+  const tableauLayouts = useMemo(
+    () =>
+      game.tableau.map((pile) => {
+        let offset = 0;
+        const positions = pile.map((card) => {
+          const position = offset;
+          offset += card.faceUp ? openStep : coveredStep;
+          return position;
+        });
+        return { positions, height: Math.max(cardHeight, (positions.at(-1) ?? 0) + cardHeight) };
+      }),
+    [game.tableau, cardHeight, coveredStep, openStep],
+  );
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.page }}>
+    <SafeArea gap={0} flex={1} bg={COLORS.page}>
       <StatusBar barStyle="light-content" />
-      <ScrollView contentContainerStyle={{ alignItems: 'center', paddingBottom: 44 }}>
-        <Column gap="lg" style={{ width: '100%', maxWidth: 1060, paddingHorizontal: 18, paddingTop: 24 }}>
+      <ScrollArea contentProps={{ align: 'center', pb: 44 }}>
+        <Block gap="lg" direction="column" w="100%" maw={1060} px={18} pt={24}>
           <Flex direction="row" wrap="wrap" justify="space-between" align="center" gap="lg">
             <Column gap="xs" fullWidth={false}>
-              <Text c={COLORS.gold} size={11} fw="bold" lts={3}>PLOCKS  /  THE CARD TABLE</Text>
-              <Title order={1} style={{ color: COLORS.white, fontSize: viewportWidth < 500 ? 36 : 52, lineHeight: 58 }}>
+              <Text c={COLORS.gold} size={11} fw="bold" lts={3}>
+                PLOCKS / THE CARD TABLE
+              </Text>
+              <Title order={1} c={COLORS.white} size={viewportWidth < 500 ? 36 : 52} lh={58}>
                 Solitaire
               </Title>
               <Text c={COLORS.muted}>A quiet game of Klondike.</Text>
             </Column>
             <Flex direction="row" wrap="wrap" gap="sm" align="center">
-              <Button title="New deal" size="sm" variant="filled" color={COLORS.gold} textColor={COLORS.page} onPress={newDeal} />
-              <Button title="Undo" size="sm" variant="outline" color={COLORS.gold} disabled={!history.length} onPress={undo} />
+              <Button
+                title="New deal"
+                size="sm"
+                variant="filled"
+                color={COLORS.gold}
+                textColor={COLORS.page}
+                onPress={newDeal}
+              />
+              <Button
+                title="Undo"
+                size="sm"
+                variant="outline"
+                color={COLORS.gold}
+                disabled={!history.length}
+                onPress={undo}
+              />
               <Button title="Hint" size="sm" variant="outline" color={COLORS.gold} onPress={showHint} />
             </Flex>
           </Flex>
@@ -296,13 +356,16 @@ function SolitaireScreen() {
             padding={viewportWidth < 500 ? 12 : 24}
             radius="xl"
             borderColor={COLORS.line}
-            style={{ overflow: 'hidden', minHeight: viewportWidth < 500 ? 310 : 500 }}
+            clip
+            mih={viewportWidth < 500 ? 310 : 500}
           >
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }}>
-              <Column gap="lg" style={{ width: boardWidth, minHeight: viewportWidth < 500 ? 280 : 450 }}>
-                <Row gap={0} style={{ width: boardWidth }}>
-                  <Column gap="xs" fullWidth={false} style={{ width: cardWidth, marginRight: gap }}>
-                    <Text c={COLORS.muted} size={10} fw="bold" lts={1.5}>STOCK</Text>
+            <ScrollArea horizontal showsHorizontalScrollIndicator={false} contentProps={{ grow: 1 }}>
+              <Block gap="lg" direction="column" w={boardWidth} mih={viewportWidth < 500 ? 280 : 450}>
+                <Block gap={0} direction="row" w={boardWidth}>
+                  <Block gap="xs" fullWidth={false} direction="column" w={cardWidth} mr={gap}>
+                    <Text c={COLORS.muted} size={10} fw="bold" lts={1.5}>
+                      STOCK
+                    </Text>
                     {game.stock.length ? (
                       <CardFace
                         card={game.stock.at(-1)!}
@@ -312,11 +375,19 @@ function SolitaireScreen() {
                         accessibilityLabel={`Stock, ${game.stock.length} cards. Draw one card.`}
                       />
                     ) : (
-                      <EmptySlot width={cardWidth} height={cardHeight} symbol="↺" label="Recycle waste pile" onPress={game.waste.length ? tapStock : undefined} />
+                      <EmptySlot
+                        width={cardWidth}
+                        height={cardHeight}
+                        symbol="↺"
+                        label="Recycle waste pile"
+                        onPress={game.waste.length ? tapStock : undefined}
+                      />
                     )}
-                  </Column>
-                  <Column gap="xs" fullWidth={false} style={{ width: cardWidth, marginRight: gap }}>
-                    <Text c={COLORS.muted} size={10} fw="bold" lts={1.5}>WASTE</Text>
+                  </Block>
+                  <Block gap="xs" fullWidth={false} direction="column" w={cardWidth} mr={gap}>
+                    <Text c={COLORS.muted} size={10} fw="bold" lts={1.5}>
+                      WASTE
+                    </Text>
                     {game.waste.length ? (
                       <CardFace
                         card={game.waste.at(-1)!}
@@ -326,14 +397,25 @@ function SolitaireScreen() {
                         onPress={() => chooseSource({ pile: 'waste' })}
                         accessibilityLabel={`Waste, ${cardLabel(game.waste.at(-1)!)}. Select card.`}
                       />
-                    ) : <EmptySlot width={cardWidth} height={cardHeight} symbol="✧" label="Empty waste pile" />}
-                  </Column>
-                  <Flex style={{ width: cardWidth, marginRight: gap }} />
+                    ) : (
+                      <EmptySlot width={cardWidth} height={cardHeight} symbol="✧" label="Empty waste pile" />
+                    )}
+                  </Block>
+                  <Block direction="row" w={cardWidth} mr={gap} />
                   {SUITS.map((suit, index) => {
                     const pile = game.foundations[suit];
                     return (
-                      <Column key={suit} gap="xs" fullWidth={false} style={{ width: cardWidth, marginRight: index < 3 ? gap : 0 }}>
-                        <Text c={COLORS.muted} size={10} fw="bold" lts={1.5}>{index === 0 ? 'FOUNDATIONS' : ' '}</Text>
+                      <Block
+                        key={suit}
+                        gap="xs"
+                        fullWidth={false}
+                        direction="column"
+                        w={cardWidth}
+                        mr={index < 3 ? gap : 0}
+                      >
+                        <Text c={COLORS.muted} size={10} fw="bold" lts={1.5}>
+                          {index === 0 ? 'FOUNDATIONS' : ' '}
+                        </Text>
                         {pile.length ? (
                           <CardFace
                             card={pile.at(-1)!}
@@ -351,24 +433,33 @@ function SolitaireScreen() {
                             symbol={SUIT_SYMBOL[suit]}
                             label={`Empty ${suit} foundation. Tap to move a selected ace.`}
                             onPress={() => tapFoundation(suit)}
-                            highlighted={selected !== null && sourceCards(game, selected)?.[0]?.suit === suit &&
-                              canMove(game, selected, { pile: 'foundation', suit })}
+                            highlighted={
+                              selected !== null &&
+                              sourceCards(game, selected)?.[0]?.suit === suit &&
+                              canMove(game, selected, { pile: 'foundation', suit })
+                            }
                           />
                         )}
-                      </Column>
+                      </Block>
                     );
                   })}
-                </Row>
+                </Block>
 
                 <Column gap="sm">
-                  <Text c={COLORS.muted} size={10} fw="bold" lts={1.5}>TABLEAU</Text>
-                  <Row gap={0} style={{ width: boardWidth, alignItems: 'flex-start' }}>
+                  <Text c={COLORS.muted} size={10} fw="bold" lts={1.5}>
+                    TABLEAU
+                  </Text>
+                  <Block gap={0} direction="row" w={boardWidth} align="flex-start">
                     {game.tableau.map((pile, column) => {
                       const layout = tableauLayouts[column];
                       return (
-                        <Flex
+                        <Block
                           key={column}
-                          style={{ width: cardWidth, height: layout.height, marginRight: column < 6 ? gap : 0, position: 'relative' }}
+                          direction="row"
+                          w={cardWidth}
+                          h={layout.height}
+                          mr={column < 6 ? gap : 0}
+                          position="relative"
                         >
                           {!pile.length && (
                             <EmptySlot
@@ -381,7 +472,9 @@ function SolitaireScreen() {
                             />
                           )}
                           {pile.map((card, cardIndex) => {
-                            const inSelection = selected?.pile === 'tableau' && selected.column === column &&
+                            const inSelection =
+                              selected?.pile === 'tableau' &&
+                              selected.column === column &&
                               cardIndex >= selected.cardIndex;
                             return (
                               <CardFace
@@ -390,62 +483,92 @@ function SolitaireScreen() {
                                 width={cardWidth}
                                 height={cardHeight}
                                 selected={inSelection}
-                                highlighted={selected !== null && cardIndex === pile.length - 1 &&
-                                  canMove(game, selected, { pile: 'tableau', column })}
+                                highlighted={
+                                  selected !== null &&
+                                  cardIndex === pile.length - 1 &&
+                                  canMove(game, selected, { pile: 'tableau', column })
+                                }
                                 onPress={card.faceUp ? () => tapTableau(column, cardIndex) : undefined}
-                                accessibilityLabel={card.faceUp
-                                  ? `Column ${column + 1}, ${cardLabel(card)}${inSelection ? ', selected' : ''}`
-                                  : `Column ${column + 1}, face-down card`}
-                                style={{ position: 'absolute', top: layout.positions[cardIndex], left: 0, zIndex: cardIndex }}
+                                accessibilityLabel={
+                                  card.faceUp
+                                    ? `Column ${column + 1}, ${cardLabel(card)}${inSelection ? ', selected' : ''}`
+                                    : `Column ${column + 1}, face-down card`
+                                }
+                                top={layout.positions[cardIndex]}
+                                zIndex={cardIndex}
                               />
                             );
                           })}
-                        </Flex>
+                        </Block>
                       );
                     })}
-                  </Row>
+                  </Block>
                 </Column>
-              </Column>
-            </ScrollView>
+              </Block>
+            </ScrollArea>
           </Card>
 
           {won ? (
             <Card bg="#294B3F" borderColor={COLORS.gold} padding="lg">
               <Column gap="sm">
-                <Title order={2} style={{ color: COLORS.gold }}>You won. Beautifully played.</Title>
+                <Title order={2} c={COLORS.gold}>
+                  You won. Beautifully played.
+                </Title>
                 <Text c={COLORS.white}>All 52 cards reached their foundations in {game.moves} moves.</Text>
-                <Button title="Play again" color={COLORS.gold} textColor={COLORS.page} variant="filled" onPress={newDeal} />
+                <Button
+                  title="Play again"
+                  color={COLORS.gold}
+                  textColor={COLORS.page}
+                  variant="filled"
+                  onPress={newDeal}
+                />
               </Column>
             </Card>
           ) : (
-            <Text c={COLORS.gold} size={14} accessibilityLiveRegion="polite">{message}</Text>
+            <Text c={COLORS.gold} size={14} accessibilityLiveRegion="polite">
+              {message}
+            </Text>
           )}
 
           <Card bg={COLORS.feltDeep} borderColor={COLORS.line} padding="md">
             <Column gap="sm">
               <Flex direction="row" justify="space-between" align="center" wrap="wrap" gap="sm">
-                <Text c={COLORS.white} fw="bold">How to play</Text>
-                <Button title={showRules ? 'Hide rules' : 'Show rules'} size="sm" variant="ghost" color={COLORS.gold} onPress={() => setShowRules(!showRules)} />
+                <Text c={COLORS.white} fw="bold">
+                  How to play
+                </Text>
+                <Button
+                  title={showRules ? 'Hide rules' : 'Show rules'}
+                  size="sm"
+                  variant="ghost"
+                  color={COLORS.gold}
+                  onPress={() => setShowRules(!showRules)}
+                />
               </Flex>
               {showRules && (
                 <Text c={COLORS.muted} lh={1.5}>
-                  Tap a face-up card or descending stack, then tap its destination. Build tableau columns downward in alternating colors. Build foundations upward from aces by suit. Only kings can fill empty columns. Tap the stock to draw one card; tap its empty slot to recycle the waste. Undo reverses your last move.
+                  Tap a face-up card or descending stack, then tap its destination. Build tableau columns downward in
+                  alternating colors. Build foundations upward from aces by suit. Only kings can fill empty columns. Tap
+                  the stock to draw one card; tap its empty slot to recycle the waste. Undo reverses your last move.
                 </Text>
               )}
             </Column>
           </Card>
-        </Column>
-      </ScrollView>
-    </SafeAreaView>
+        </Block>
+      </ScrollArea>
+    </SafeArea>
   );
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <Card bg={COLORS.feltDeep} borderColor={COLORS.line} padding="sm" radius="md" style={{ minWidth: 106 }}>
+    <Card bg={COLORS.feltDeep} borderColor={COLORS.line} padding="sm" radius="md" miw={106}>
       <Column gap={2}>
-        <Text c={COLORS.muted} size={10} fw="bold" lts={1.4}>{label}</Text>
-        <Text c={COLORS.white} size={17} fw="bold">{value}</Text>
+        <Text c={COLORS.muted} size={10} fw="bold" lts={1.4}>
+          {label}
+        </Text>
+        <Text c={COLORS.white} size={17} fw="bold">
+          {value}
+        </Text>
       </Column>
     </Card>
   );
