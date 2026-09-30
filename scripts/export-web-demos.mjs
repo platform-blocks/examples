@@ -50,11 +50,14 @@ for (const [index, name] of appNames.entries()) {
   }
 
   console.log(`Exporting ${slug} (${index + 1}/${appNames.length})`);
+  // Keep each export within the memory budget of the docs deployment runner.
   const result = spawnSync(process.execPath, [
     path.join(root, 'node_modules/expo/bin/cli'),
-    'export', '--platform', 'web', '--output-dir', path.join(output, slug),
+    'export', '--platform', 'web', '--max-workers', '2', '--output-dir', path.join(output, slug),
   ], { cwd: appRoot, stdio: 'inherit', env: process.env });
-  if (result.status !== 0) process.exit(result.status ?? 1);
+  if (result.error || result.signal || result.status !== 0) {
+    throw new Error(`${slug} export failed: ${result.error?.message ?? result.signal ?? `exit code ${result.status}`}`);
+  }
   if (!fs.existsSync(path.join(output, slug, 'index.html'))) {
     throw new Error(`${slug} did not produce index.html`);
   }
