@@ -44,6 +44,6 @@ Run `npm run validate:ui` to check every app and generated Snack for direct nati
 
 ## Expo Snack
 
-Run `npm run snack:generate` to refresh `snacks/` and `snack-manifest.json`. This creates Snack-ready copies of all apps with an `App.tsx` entry: imports use `@plocks/ui-snack`, and local media files are included. After generating, copy `snack-manifest.json` to `plocks/apps/docs/config/appSnackManifest.json`. The docs site uses that manifest to build short Snack links that load these files from GitHub raw URLs. Snack runs on Expo SDK 54, so it uses published plocks packages rather than the local checkout. The links remain disabled until this repository is public and the required packages work together on that SDK.
+Run `npm run snack:generate` to refresh `snacks/` and `snack-manifest.json`. This creates Snack-ready copies of all apps with an `App.tsx` entry: imports use `@plocks/ui-snack`, and local media files are included. After generating, copy `snack-manifest.json` to `plocks/apps/docs/config/appSnackManifest.json`. The docs site uses that manifest to build Snack links that load these files from GitHub raw URLs. Snack runs on Expo SDK 54, so it uses published plocks packages rather than the local checkout. The gallery exposes native Snack links only for apps verified on that SDK; generated source bundles for the others are not yet native previews.
 
 All 28 current apps have an `App.tsx` entry and a generated Snack source bundle.
