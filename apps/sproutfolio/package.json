@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@plocks/brands": "file:../../../plocks/packages/brands",
     "@plocks/charts": "file:../../../plocks/packages/charts",
     "@plocks/ui": "file:../../../plocks/packages/ui",
     "@react-native-async-storage/async-storage": "2.2.0",

@@ -1,6 +1,6 @@
 # plocks Idea Grid
 
-A searchable, responsive masonry feed with local photography, pin detail views, categories, and saved ideas.
+A searchable, responsive masonry feed with local photography, categories, and saved ideas. Opening a pin shows a closeup page: the full image with like, share and save actions, creator details with a follow button, comments, and a "More like this" grid. Phones get a single column; wider screens show the image and details side by side in a card.
 
 This standalone Expo example uses the `@plocks/ui` Masonry component and a `PlocksProvider` theme. Saved pins are stored on device. Its feed and detail view live in [`App.tsx`](./App.tsx).
 

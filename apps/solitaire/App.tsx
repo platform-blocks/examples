@@ -1,7 +1,17 @@
-import { useEffect, useMemo, useState } from 'react';
-import { StatusBar, useWindowDimensions } from 'react-native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { Block, ScrollArea, SafeArea, Button, Card, Column, Flex, PlocksProvider, Text, Title } from '@plocks/ui';
+import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react';
+import { Animated, Easing, Platform, StatusBar, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
+import {
+  IconArrowBackUp,
+  IconBolt,
+  IconBulb,
+  IconCards,
+  IconMenu2,
+  IconRefresh,
+  IconTrophy,
+} from '@tabler/icons-react-native';
+import { Block, Button, Dialog, Gradient, MotionBlock, PlocksProvider, ScrollArea, Switch, Text } from '@plocks/ui';
 
 import {
   SUITS,
@@ -18,566 +28,693 @@ import {
   sourceCards,
   type Destination,
   type GameState,
+  type Hint,
   type PlayingCard,
   type Source,
   type Suit,
 } from './game';
 
-const COLORS = {
-  page: '#0B211C',
-  felt: '#174638',
-  feltDeep: '#123A30',
-  line: 'rgba(226, 239, 219, 0.15)',
-  cream: '#FFFCF4',
-  gold: '#E9C98C',
-  muted: '#AEC7B9',
-  white: '#F6F6E9',
-  red: '#BB3D44',
-  black: '#253A39',
+const C = {
+  felt: ['#17694A', '#0E4F37', '#093826'] as const,
+  bar: 'rgba(3, 22, 15, 0.42)',
+  hairline: 'rgba(255, 255, 255, 0.08)',
+  white: '#FFFFFF',
+  text: '#F3F7F4',
+  muted: 'rgba(235, 245, 239, 0.62)',
+  face: '#FFFFFF',
+  faceEdge: 'rgba(15, 30, 25, 0.14)',
+  red: '#D7263D',
+  black: '#1A1F2B',
+  back: ['#3456C8', '#1D2F7A'] as const,
+  backLine: 'rgba(255, 255, 255, 0.28)',
+  gold: '#FFC93C',
+  target: '#6EF0B0',
+  slot: 'rgba(0, 0, 0, 0.16)',
+  slotEdge: 'rgba(255, 255, 255, 0.24)',
+  slotInk: 'rgba(255, 255, 255, 0.32)',
 };
 
-const GAME_THEME = { colorScheme: 'dark' as const };
+const NATIVE = Platform.OS !== 'web';
+const SERIF = Platform.select({ android: 'serif', default: 'Georgia' });
+const PRESSED_ITEM = { opacity: 0.55 };
+const PRESSED_CARD = { opacity: 0.88 };
+const CONFETTI = ['#FFC93C', '#FF5D73', '#6EF0B0', '#7AA7FF', '#FFFFFF'];
+
+type Snapshot = { game: GameState; score: number };
+type Box = { w: number; h: number };
+type IconType = ComponentType<{ size?: number; color?: string }>;
 
 function formatTime(seconds: number): string {
-  const minutes = Math.floor(seconds / 60)
-    .toString()
-    .padStart(2, '0');
-  const remaining = (seconds % 60).toString().padStart(2, '0');
-  return `${minutes}:${remaining}`;
+  return `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, '0')}`;
 }
 
-function sourceEquals(left: Source | null, right: Source): boolean {
+function haptic(kind: 'tap' | 'error' | 'win') {
+  if (Platform.OS === 'web') return;
+  if (kind === 'tap') void Haptics.selectionAsync().catch(() => {});
+  else void Haptics.notificationAsync(kind === 'win' ? Haptics.NotificationFeedbackType.Success
+    : Haptics.NotificationFeedbackType.Warning).catch(() => {});
+}
+
+function sameSource(left: Source | null, right: Source): boolean {
   if (!left || left.pile !== right.pile) return false;
-  if (left.pile === 'waste') return true;
   if (left.pile === 'foundation' && right.pile === 'foundation') return left.suit === right.suit;
-  return (
-    left.pile === 'tableau' &&
-    right.pile === 'tableau' &&
-    left.column === right.column &&
-    left.cardIndex === right.cardIndex
-  );
+  if (left.pile === 'tableau' && right.pile === 'tableau') {
+    return left.column === right.column && left.cardIndex === right.cardIndex;
+  }
+  return true;
 }
 
-type CardFaceProps = {
+function sameDestination(left: Destination | undefined, right: Destination): boolean {
+  if (!left || left.pile !== right.pile) return false;
+  return left.pile === 'foundation' && right.pile === 'foundation' ? left.suit === right.suit
+    : left.pile === 'tableau' && right.pile === 'tableau' && left.column === right.column;
+}
+
+function bestDestination(game: GameState, source: Source): Destination | null {
+  const cards = sourceCards(game, source);
+  if (!cards) return null;
+  const foundation: Destination = { pile: 'foundation', suit: cards[0].suit };
+  if (source.pile !== 'foundation' && canMove(game, source, foundation)) return foundation;
+  const columns = [0, 1, 2, 3, 4, 5, 6].filter((column) => canMove(game, source, { pile: 'tableau', column }));
+  const filled = columns.find((column) => game.tableau[column].length);
+  if (filled !== undefined) return { pile: 'tableau', column: filled };
+  const kingAlreadyBase = source.pile === 'tableau' && source.cardIndex === 0;
+  return columns.length && !kingAlreadyBase ? { pile: 'tableau', column: columns[0] } : null;
+}
+
+function moveScore(game: GameState, source: Source, destination: Destination): number {
+  let score = 0;
+  if (destination.pile === 'foundation') score += source.pile === 'foundation' ? 0 : 10;
+  else if (source.pile === 'waste') score += 5;
+  else if (source.pile === 'foundation') score -= 15;
+  if (source.pile === 'tableau' && source.cardIndex > 0 && !game.tableau[source.column][source.cardIndex - 1].faceUp) {
+    score += 5;
+  }
+  return score;
+}
+
+function foundationMove(game: GameState): [Source, Destination] | null {
+  const sources: Source[] = [
+    { pile: 'waste' },
+    ...game.tableau.map((pile, column): Source => ({ pile: 'tableau', column, cardIndex: pile.length - 1 })),
+  ];
+  for (const source of sources) {
+    const card = sourceCards(game, source)?.[0];
+    if (card && canMove(game, source, { pile: 'foundation', suit: card.suit })) {
+      return [source, { pile: 'foundation', suit: card.suit }];
+    }
+  }
+  return null;
+}
+
+function tableLayout(area: Box, game: GameState, compact: boolean) {
+  const pad = area.w < 500 ? 6 : area.w < 900 ? 16 : 28;
+  const usableW = Math.max(280, area.w - pad * 2);
+  const gap = Math.max(4, Math.min(16, Math.round(usableW * 0.012)));
+  const cardW = Math.floor(Math.min((usableW - gap * 6) / 7, (area.h - pad) / 4.3, 128));
+  const cardH = Math.round(cardW * 1.4);
+  const width = cardW * 7 + gap * 6;
+  const top = compact ? 6 : pad;
+  const tableauTop = top + cardH + Math.max(10, gap * 2);
+  const room = area.h - tableauTop - pad - cardH;
+  const rankSize = Math.max(11, Math.round(cardW * 0.32));
+  const inset = Math.max(3, Math.round(cardW * 0.07));
+  const minOpen = Math.round(rankSize * 1.05 + inset);
+  const columns = game.tableau.map((pile) => {
+    let covered = Math.round(cardH * 0.12);
+    let open = Math.max(minOpen, Math.round(cardH * 0.27));
+    const hidden = pile.slice(0, -1).filter((card) => !card.faceUp).length;
+    const shown = Math.max(0, pile.length - 1 - hidden);
+    if (hidden * covered + shown * open > room) {
+      covered = Math.max(Math.round(cardH * 0.06), Math.floor((room - shown * open) / Math.max(1, hidden)));
+      if (hidden * covered + shown * open > room && shown) {
+        open = Math.max(minOpen, Math.floor((room - hidden * covered) / shown));
+      }
+    }
+    let offset = 0;
+    return pile.map((card) => {
+      const y = offset;
+      offset += card.faceUp ? open : covered;
+      return y;
+    });
+  });
+  const height = Math.max(
+    area.h,
+    ...columns.map((ys) => tableauTop + (ys.at(-1) ?? 0) + cardH + pad),
+  );
+  const x = (column: number) => column * (cardW + gap);
+  return { cardW, cardH, gap, width, height, top, tableauTop, columns, rankSize, inset, x };
+}
+
+type CardSpec = {
   card: PlayingCard;
-  width: number;
-  height: number;
-  selected?: boolean;
-  highlighted?: boolean;
+  x: number;
+  y: number;
+  z: number;
+  label?: string;
+  ring?: string;
+  flat?: boolean;
   onPress?: () => void;
-  top?: number;
-  zIndex?: number;
-  accessibilityLabel?: string;
 };
 
-function CardFace({
-  card,
-  width,
-  height,
-  selected,
-  highlighted,
-  onPress,
-  top,
-  zIndex,
-  accessibilityLabel,
-}: CardFaceProps) {
-  const red = isRed(card.suit);
-  const ink = red ? COLORS.red : COLORS.black;
-  const small = width < 60;
-  const rankSize = small ? 14 : 21;
-  const suitSize = small ? 12 : 18;
-  const centerSize = small ? 27 : 43;
-
+function CardFace({ card, w, h, rankSize, inset }: { card: PlayingCard; w: number; h: number; rankSize: number; inset: number }) {
+  const ink = isRed(card.suit) ? C.red : C.black;
+  const court = card.rank > 10;
+  const suit = SUIT_SYMBOL[card.suit];
   return (
-    <Card
-      onPress={onPress}
-      accessibilityLabel={accessibilityLabel ?? (card.faceUp ? cardLabel(card) : 'Face-down card')}
-      padding={0}
-      radius="md"
-      bg={card.faceUp ? COLORS.cream : '#20564A'}
-      borderColor={selected || highlighted ? COLORS.gold : card.faceUp ? '#DFD9C8' : '#81A79A'}
-      borderWidth={selected ? 3 : highlighted ? 2 : 1}
-      w={width}
-      h={height}
-      clip
-      shadow="md"
-      position={top === undefined ? 'relative' : 'absolute'}
-      top={top}
-      left={top === undefined ? undefined : 0}
-      zIndex={zIndex}
-    >
-      {card.faceUp ? (
-        <>
-          <Block
-            gap={0}
-            direction="column"
-            position="absolute"
-            top={small ? 3 : 6}
-            left={small ? 4 : 8}
-            fullWidth={false}
-          >
-            <Text fw="bold" c={ink} size={rankSize} lh={1}>
-              {rankLabel(card.rank)}
-            </Text>
-            <Text c={ink} size={suitSize} lh={1}>
-              {SUIT_SYMBOL[card.suit]}
-            </Text>
-          </Block>
-          <Block align="center" justify="center" direction="row" flex={1}>
-            <Text c={ink} size={centerSize} lh={1}>
-              {SUIT_SYMBOL[card.suit]}
-            </Text>
-          </Block>
-          {!small && (
-            <Text c={ink} size={16} position="absolute" bottom={5} right={8}>
-              {SUIT_SYMBOL[card.suit]}
-            </Text>
-          )}
-        </>
-      ) : (
-        <Block
-          align="center"
-          justify="center"
-          direction="row"
-          flex={1}
-          m={4}
-          borderWidth={1}
-          borderColor="#7FA69A"
-          radius={6}
-        >
-          <Text c={COLORS.gold} size={small ? 21 : 36} lh={1}>
-            ✦
-          </Text>
-        </Block>
-      )}
-    </Card>
-  );
-}
-
-function EmptySlot({
-  width,
-  height,
-  symbol,
-  label,
-  onPress,
-  highlighted = false,
-}: {
-  width: number;
-  height: number;
-  symbol: string;
-  label: string;
-  onPress?: () => void;
-  highlighted?: boolean;
-}) {
-  return (
-    <Card
-      variant="outline"
-      bg="rgba(7, 31, 25, 0.22)"
-      padding={0}
-      radius="md"
-      borderColor={highlighted ? COLORS.gold : 'rgba(226, 239, 219, 0.27)'}
-      onPress={onPress}
-      accessibilityLabel={label}
-      borderStyle="dashed"
-      w={width}
-      h={height}
-    >
-      <Block align="center" justify="center" direction="row" flex={1}>
-        <Text c={highlighted ? COLORS.gold : 'rgba(226, 239, 219, 0.34)'} size={width < 60 ? 22 : 38}>
-          {symbol}
+    <Block fluid gap={0}>
+      <Block direction="row" justify="space-between" align="flex-start" gap={0} px={inset} pt={Math.max(1, inset - 2)}>
+        <Text c={ink} fw="bold" size={rankSize} lh={1.05} lts={card.rank === 10 ? -1 : 0}>
+          {rankLabel(card.rank)}
+        </Text>
+        <Text c={ink} size={Math.round(rankSize * 0.85)} lh={1.15}>
+          {suit}
         </Text>
       </Block>
-    </Card>
+      <Block fluid align="center" justify="center" gap={0} pb={Math.round(h * 0.06)}>
+        {court ? (
+          <Block align="center" justify="center" gap={0} w={w * 0.62} h={h * 0.5} radius={Math.round(w * 0.08)}
+            bg={isRed(card.suit) ? 'rgba(215, 38, 61, 0.08)' : 'rgba(26, 31, 43, 0.07)'}>
+            <Text c={ink} ff={SERIF} fw="bold" size={Math.round(w * 0.42)} lh={1}>
+              {rankLabel(card.rank)}
+            </Text>
+          </Block>
+        ) : (
+          <Text c={ink} size={Math.round(w * (card.rank === 1 ? 0.62 : 0.5))} lh={1}>
+            {suit}
+          </Text>
+        )}
+      </Block>
+    </Block>
   );
 }
 
-function SolitaireScreen() {
-  const { width: viewportWidth } = useWindowDimensions();
-  const [game, setGame] = useState<GameState>(() => createGame());
-  const [history, setHistory] = useState<GameState[]>([]);
-  const [selected, setSelected] = useState<Source | null>(null);
-  const [message, setMessage] = useState('Select a face-up card, then tap where it should go.');
-  const [seconds, setSeconds] = useState(0);
-  const [showRules, setShowRules] = useState(false);
-
-  const won = isWon(game);
-  useEffect(() => {
-    if (won) return;
-    const timer = setInterval(() => setSeconds((value) => value + 1), 1000);
-    return () => clearInterval(timer);
-  }, [won]);
-
-  const boardWidth = Math.max(320, Math.min(870, viewportWidth - (viewportWidth < 500 ? 60 : 72)));
-  const gap = Math.max(6, Math.round(boardWidth * 0.014));
-  const cardWidth = (boardWidth - gap * 6) / 7;
-  const cardHeight = Math.round(cardWidth * 1.43);
-  const coveredStep = Math.max(11, Math.round(cardHeight * 0.15));
-  const openStep = Math.max(26, Math.round(cardHeight * 0.28));
-  const foundationCount = SUITS.reduce((total, suit) => total + game.foundations[suit].length, 0);
-
-  function commit(next: GameState, feedback: string) {
-    setHistory((previous) => [...previous.slice(-99), game]);
-    setGame(next);
-    setSelected(null);
-    setMessage(feedback);
-  }
-
-  function tryDestination(destination: Destination): boolean {
-    if (!selected) return false;
-    const next = moveCards(game, selected, destination);
-    if (!next) return false;
-    const card = sourceCards(game, selected)?.[0];
-    commit(next, card ? `Moved ${cardLabel(card)}.` : 'Nice move.');
-    return true;
-  }
-
-  function chooseSource(source: Source) {
-    if (sourceEquals(selected, source)) {
-      setSelected(null);
-      setMessage('Selection cleared.');
-      return;
-    }
-    const cards = sourceCards(game, source);
-    if (!cards) return;
-    setSelected(source);
-    setMessage(
-      cards.length > 1
-        ? `${cardLabel(cards[0])} and ${cards.length - 1} more selected. Tap a tableau column.`
-        : `${cardLabel(cards[0])} selected. Tap a valid destination.`,
-    );
-  }
-
-  function tapTableau(column: number, cardIndex?: number) {
-    if (selected && tryDestination({ pile: 'tableau', column })) return;
-    if (cardIndex !== undefined) chooseSource({ pile: 'tableau', column, cardIndex });
-    else if (selected) setMessage('Only a king can move into an empty column.');
-  }
-
-  function tapFoundation(suit: Suit) {
-    if (selected && tryDestination({ pile: 'foundation', suit })) return;
-    if (game.foundations[suit].length) chooseSource({ pile: 'foundation', suit });
-    else if (selected) setMessage(`Only the ace of ${suit} starts this foundation.`);
-  }
-
-  function tapStock() {
-    const next = drawStock(game);
-    if (next) commit(next, game.stock.length ? 'Drew a card from the stock.' : 'Stock recycled.');
-  }
-
-  function undo() {
-    const previous = history.at(-1);
-    if (!previous) return;
-    setGame(previous);
-    setHistory((items) => items.slice(0, -1));
-    setSelected(null);
-    setMessage('Last move undone.');
-  }
-
-  function newDeal() {
-    setGame(createGame());
-    setHistory([]);
-    setSelected(null);
-    setSeconds(0);
-    setMessage('Fresh deck. Good luck!');
-  }
-
-  function showHint() {
-    const hint = findHint(game);
-    if (hint) {
-      setSelected(hint.source);
-      setMessage(hint.text);
-    } else if (game.stock.length || game.waste.length) {
-      setSelected(null);
-      setMessage(game.stock.length ? 'Try drawing from the stock.' : 'Recycle the waste pile to keep looking.');
-    } else {
-      setSelected(null);
-      setMessage('No available moves. Start a new deal to try again.');
-    }
-  }
-
-  const tableauLayouts = useMemo(
-    () =>
-      game.tableau.map((pile) => {
-        let offset = 0;
-        const positions = pile.map((card) => {
-          const position = offset;
-          offset += card.faceUp ? openStep : coveredStep;
-          return position;
-        });
-        return { positions, height: Math.max(cardHeight, (positions.at(-1) ?? 0) + cardHeight) };
-      }),
-    [game.tableau, cardHeight, coveredStep, openStep],
-  );
-
+function CardBack({ w, radius }: { w: number; radius: number }) {
+  const diamond = Math.round(w * 0.3);
   return (
-    <SafeArea gap={0} flex={1} bg={COLORS.page}>
-      <StatusBar barStyle="light-content" />
-      <ScrollArea contentProps={{ align: 'center', pb: 44 }}>
-        <Block gap="lg" direction="column" w="100%" maw={1060} px={18} pt={24}>
-          <Flex direction="row" wrap="wrap" justify="space-between" align="center" gap="lg">
-            <Column gap="xs" fullWidth={false}>
-              <Text c={COLORS.gold} size={11} fw="bold" lts={3}>
-                PLOCKS / THE CARD TABLE
-              </Text>
-              <Title order={1} c={COLORS.white} size={viewportWidth < 500 ? 36 : 52} lh={58}>
-                Solitaire
-              </Title>
-              <Text c={COLORS.muted}>A quiet game of Klondike.</Text>
-            </Column>
-            <Flex direction="row" wrap="wrap" gap="sm" align="center">
-              <Button
-                title="New deal"
-                size="sm"
-                variant="filled"
-                color={COLORS.gold}
-                textColor={COLORS.page}
-                onPress={newDeal}
-              />
-              <Button
-                title="Undo"
-                size="sm"
-                variant="outline"
-                color={COLORS.gold}
-                disabled={!history.length}
-                onPress={undo}
-              />
-              <Button title="Hint" size="sm" variant="outline" color={COLORS.gold} onPress={showHint} />
-            </Flex>
-          </Flex>
+    <Gradient colors={C.back} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} fluid p={Math.max(3, Math.round(w * 0.07))}>
+      <Block fluid align="center" justify="center" gap={0} radius={Math.max(2, radius - 3)}
+        borderWidth={1} borderColor={C.backLine}>
+        <Block w={diamond} h={diamond} rotate="45deg" radius={Math.round(diamond * 0.18)}
+          borderWidth={1.5} borderColor={C.backLine} bg="rgba(255, 255, 255, 0.08)" />
+      </Block>
+    </Gradient>
+  );
+}
 
-          <Flex direction="row" wrap="wrap" gap="sm">
-            <Stat label="TIME" value={formatTime(seconds)} />
-            <Stat label="MOVES" value={String(game.moves)} />
-            <Stat label="FOUNDATIONS" value={`${foundationCount} / 52`} />
-          </Flex>
+function TableCard({ spec, w, h, rankSize, inset, shake }: {
+  spec: CardSpec; w: number; h: number; rankSize: number; inset: number; shake: number;
+}) {
+  const pos = useRef(new Animated.ValueXY({ x: spec.x, y: spec.y })).current;
+  const nudge = useRef(new Animated.Value(0)).current;
+  const last = useRef({ x: spec.x, y: spec.y });
+  const [flying, setFlying] = useState(false);
 
-          <Card
-            bg={COLORS.felt}
-            padding={viewportWidth < 500 ? 12 : 24}
-            radius="xl"
-            borderColor={COLORS.line}
-            clip
-            mih={viewportWidth < 500 ? 310 : 500}
-          >
-            <ScrollArea horizontal showsHorizontalScrollIndicator={false} contentProps={{ grow: 1 }}>
-              <Block gap="lg" direction="column" w={boardWidth} mih={viewportWidth < 500 ? 280 : 450}>
-                <Block gap={0} direction="row" w={boardWidth}>
-                  <Block gap="xs" fullWidth={false} direction="column" w={cardWidth} mr={gap}>
-                    <Text c={COLORS.muted} size={10} fw="bold" lts={1.5}>
-                      STOCK
-                    </Text>
-                    {game.stock.length ? (
-                      <CardFace
-                        card={game.stock.at(-1)!}
-                        width={cardWidth}
-                        height={cardHeight}
-                        onPress={tapStock}
-                        accessibilityLabel={`Stock, ${game.stock.length} cards. Draw one card.`}
-                      />
-                    ) : (
-                      <EmptySlot
-                        width={cardWidth}
-                        height={cardHeight}
-                        symbol="↺"
-                        label="Recycle waste pile"
-                        onPress={game.waste.length ? tapStock : undefined}
-                      />
-                    )}
-                  </Block>
-                  <Block gap="xs" fullWidth={false} direction="column" w={cardWidth} mr={gap}>
-                    <Text c={COLORS.muted} size={10} fw="bold" lts={1.5}>
-                      WASTE
-                    </Text>
-                    {game.waste.length ? (
-                      <CardFace
-                        card={game.waste.at(-1)!}
-                        width={cardWidth}
-                        height={cardHeight}
-                        selected={selected?.pile === 'waste'}
-                        onPress={() => chooseSource({ pile: 'waste' })}
-                        accessibilityLabel={`Waste, ${cardLabel(game.waste.at(-1)!)}. Select card.`}
-                      />
-                    ) : (
-                      <EmptySlot width={cardWidth} height={cardHeight} symbol="✧" label="Empty waste pile" />
-                    )}
-                  </Block>
-                  <Block direction="row" w={cardWidth} mr={gap} />
-                  {SUITS.map((suit, index) => {
-                    const pile = game.foundations[suit];
-                    return (
-                      <Block
-                        key={suit}
-                        gap="xs"
-                        fullWidth={false}
-                        direction="column"
-                        w={cardWidth}
-                        mr={index < 3 ? gap : 0}
-                      >
-                        <Text c={COLORS.muted} size={10} fw="bold" lts={1.5}>
-                          {index === 0 ? 'FOUNDATIONS' : ' '}
-                        </Text>
-                        {pile.length ? (
-                          <CardFace
-                            card={pile.at(-1)!}
-                            width={cardWidth}
-                            height={cardHeight}
-                            selected={selected?.pile === 'foundation' && selected.suit === suit}
-                            highlighted={selected !== null && canMove(game, selected, { pile: 'foundation', suit })}
-                            onPress={() => tapFoundation(suit)}
-                            accessibilityLabel={`${suit} foundation, top card ${cardLabel(pile.at(-1)!)}.`}
-                          />
-                        ) : (
-                          <EmptySlot
-                            width={cardWidth}
-                            height={cardHeight}
-                            symbol={SUIT_SYMBOL[suit]}
-                            label={`Empty ${suit} foundation. Tap to move a selected ace.`}
-                            onPress={() => tapFoundation(suit)}
-                            highlighted={
-                              selected !== null &&
-                              sourceCards(game, selected)?.[0]?.suit === suit &&
-                              canMove(game, selected, { pile: 'foundation', suit })
-                            }
-                          />
-                        )}
-                      </Block>
-                    );
-                  })}
-                </Block>
+  useEffect(() => {
+    const previous = last.current;
+    last.current = { x: spec.x, y: spec.y };
+    const distance = Math.abs(previous.x - spec.x) + Math.abs(previous.y - spec.y);
+    if (!distance) return;
+    const far = distance > h * 0.5;
+    if (far) setFlying(true);
+    Animated.timing(pos, {
+      toValue: { x: spec.x, y: spec.y },
+      duration: far ? 240 : 140,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: NATIVE,
+    }).start(() => far && setFlying(false));
+  }, [spec.x, spec.y, h, pos]);
 
-                <Column gap="sm">
-                  <Text c={COLORS.muted} size={10} fw="bold" lts={1.5}>
-                    TABLEAU
-                  </Text>
-                  <Block gap={0} direction="row" w={boardWidth} align="flex-start">
-                    {game.tableau.map((pile, column) => {
-                      const layout = tableauLayouts[column];
-                      return (
-                        <Block
-                          key={column}
-                          direction="row"
-                          w={cardWidth}
-                          h={layout.height}
-                          mr={column < 6 ? gap : 0}
-                          position="relative"
-                        >
-                          {!pile.length && (
-                            <EmptySlot
-                              width={cardWidth}
-                              height={cardHeight}
-                              symbol="K"
-                              label={`Empty tableau column ${column + 1}. Tap to move a selected king.`}
-                              onPress={() => tapTableau(column)}
-                              highlighted={selected !== null && canMove(game, selected, { pile: 'tableau', column })}
-                            />
-                          )}
-                          {pile.map((card, cardIndex) => {
-                            const inSelection =
-                              selected?.pile === 'tableau' &&
-                              selected.column === column &&
-                              cardIndex >= selected.cardIndex;
-                            return (
-                              <CardFace
-                                key={`${card.suit}-${card.rank}`}
-                                card={card}
-                                width={cardWidth}
-                                height={cardHeight}
-                                selected={inSelection}
-                                highlighted={
-                                  selected !== null &&
-                                  cardIndex === pile.length - 1 &&
-                                  canMove(game, selected, { pile: 'tableau', column })
-                                }
-                                onPress={card.faceUp ? () => tapTableau(column, cardIndex) : undefined}
-                                accessibilityLabel={
-                                  card.faceUp
-                                    ? `Column ${column + 1}, ${cardLabel(card)}${inSelection ? ', selected' : ''}`
-                                    : `Column ${column + 1}, face-down card`
-                                }
-                                top={layout.positions[cardIndex]}
-                                zIndex={cardIndex}
-                              />
-                            );
-                          })}
-                        </Block>
-                      );
-                    })}
-                  </Block>
-                </Column>
-              </Block>
-            </ScrollArea>
-          </Card>
+  useEffect(() => {
+    if (!shake) return;
+    Animated.sequence([6, -6, 4, -4, 0].map((toValue) =>
+      Animated.timing(nudge, { toValue, duration: 45, useNativeDriver: NATIVE }))).start();
+  }, [shake, nudge]);
 
-          {won ? (
-            <Card bg="#294B3F" borderColor={COLORS.gold} padding="lg">
-              <Column gap="sm">
-                <Title order={2} c={COLORS.gold}>
-                  You won. Beautifully played.
-                </Title>
-                <Text c={COLORS.white}>All 52 cards reached their foundations in {game.moves} moves.</Text>
-                <Button
-                  title="Play again"
-                  color={COLORS.gold}
-                  textColor={COLORS.page}
-                  variant="filled"
-                  onPress={newDeal}
-                />
-              </Column>
-            </Card>
-          ) : (
-            <Text c={COLORS.gold} size={14} accessibilityLiveRegion="polite">
-              {message}
-            </Text>
-          )}
-
-          <Card bg={COLORS.feltDeep} borderColor={COLORS.line} padding="md">
-            <Column gap="sm">
-              <Flex direction="row" justify="space-between" align="center" wrap="wrap" gap="sm">
-                <Text c={COLORS.white} fw="bold">
-                  How to play
-                </Text>
-                <Button
-                  title={showRules ? 'Hide rules' : 'Show rules'}
-                  size="sm"
-                  variant="ghost"
-                  color={COLORS.gold}
-                  onPress={() => setShowRules(!showRules)}
-                />
-              </Flex>
-              {showRules && (
-                <Text c={COLORS.muted} lh={1.5}>
-                  Tap a face-up card or descending stack, then tap its destination. Build tableau columns downward in
-                  alternating colors. Build foundations upward from aces by suit. Only kings can fill empty columns. Tap
-                  the stock to draw one card; tap its empty slot to recycle the waste. Undo reverses your last move.
-                </Text>
-              )}
-            </Column>
-          </Card>
+  const radius = Math.max(4, Math.round(w * 0.1));
+  return (
+    <MotionBlock position="absolute" top={0} left={0} translateX={pos.x} translateY={pos.y}
+      zIndex={flying ? 1000 + spec.z : spec.z}>
+      <MotionBlock translateX={nudge}>
+        <Block w={w} h={h} radius={radius} bg={C.face} overflow="hidden" gap={0}
+          borderWidth={spec.ring ? 2 : 1} borderColor={spec.ring ?? C.faceEdge}
+          shadow={flying || spec.ring ? 'lg' : spec.flat ? 'none' : 'sm'}
+          onPress={spec.onPress} pressedStyle={PRESSED_CARD} disabled={!spec.onPress}
+          accessibilityLabel={spec.label} accessibilityElementsHidden={!spec.label}
+          importantForAccessibility={spec.label ? 'auto' : 'no-hide-descendants'}>
+          {spec.card.faceUp
+            ? <CardFace card={spec.card} w={w} h={h} rankSize={rankSize} inset={inset} />
+            : <CardBack w={w} radius={radius} />}
         </Block>
-      </ScrollArea>
-    </SafeArea>
+      </MotionBlock>
+    </MotionBlock>
+  );
+}
+
+function Slot({ x, y, w, h, ring, label, onPress, children }: {
+  x: number; y: number; w: number; h: number; ring?: string; label?: string;
+  onPress?: () => void; children?: ReactNode;
+}) {
+  return (
+    <Block position="absolute" left={x} top={y} w={w} h={h} radius={Math.max(4, Math.round(w * 0.1))}
+      bg={C.slot} borderWidth={ring ? 2 : 1.5} borderColor={ring ?? C.slotEdge} borderStyle={ring ? 'solid' : 'dashed'}
+      align="center" justify="center" gap={0} zIndex={0}
+      onPress={onPress} pressedStyle={PRESSED_ITEM} disabled={!onPress} accessibilityLabel={label}
+      accessibilityElementsHidden={!label} importantForAccessibility={label ? 'auto' : 'no-hide-descendants'}>
+      {children}
+    </Block>
   );
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <Card bg={COLORS.feltDeep} borderColor={COLORS.line} padding="sm" radius="md" miw={106}>
-      <Column gap={2}>
-        <Text c={COLORS.muted} size={10} fw="bold" lts={1.4}>
-          {label}
-        </Text>
-        <Text c={COLORS.white} size={17} fw="bold">
-          {value}
-        </Text>
-      </Column>
-    </Card>
+    <Block align="center" gap={0} miw={64}>
+      <Text c={C.muted} size={10} fw="bold" lts={1.2}>
+        {label}
+      </Text>
+      <Text c={C.text} size={17} fw="bold" lh={1.2}>
+        {value}
+      </Text>
+    </Block>
+  );
+}
+
+function Action({ icon: Icon, label, onPress, disabled, active }: {
+  icon: IconType; label: string; onPress: () => void; disabled?: boolean; active?: boolean;
+}) {
+  return (
+    <Block grow={1} basis={0} mih={56} miw={64} align="center" justify="center" gap={3} radius={14} py={6}
+      bg={active ? 'rgba(255, 201, 60, 0.16)' : undefined} opacity={disabled ? 0.38 : 1}
+      onPress={onPress} disabled={disabled} pressedStyle={PRESSED_ITEM} accessibilityLabel={label}>
+      <Icon size={24} color={active ? C.gold : C.text} />
+      <Text c={active ? C.gold : C.text} size={11} fw="semibold">
+        {label}
+      </Text>
+    </Block>
+  );
+}
+
+function Confetti({ area }: { area: Box }) {
+  const pieces = useMemo(() => Array.from({ length: 36 }, (_, index) => ({
+    value: new Animated.Value(-30),
+    left: Math.random() * area.w,
+    size: 6 + Math.random() * 6,
+    color: CONFETTI[index % CONFETTI.length],
+    spin: `${Math.round(360 + Math.random() * 720)}deg`,
+    delay: Math.random() * 1400,
+    duration: 2200 + Math.random() * 1600,
+  })), [area.w]);
+  useEffect(() => {
+    const loops = pieces.map((piece) => Animated.loop(Animated.sequence([
+      Animated.delay(piece.delay),
+      Animated.timing(piece.value, {
+        toValue: area.h + 30, duration: piece.duration, easing: Easing.linear, useNativeDriver: NATIVE,
+      }),
+    ])));
+    loops.forEach((loop) => loop.start());
+    return () => loops.forEach((loop) => loop.stop());
+  }, [pieces, area.h]);
+  return (
+    <Block position="absolute" inset={0} zIndex={2000} pointerEvents="none" overflow="hidden">
+      {pieces.map((piece, index) => (
+        <MotionBlock key={index} position="absolute" top={0} left={piece.left} w={piece.size} h={piece.size * 1.6}
+          radius={2} bg={piece.color} translateY={piece.value}
+          motionRotate={piece.value.interpolate({ inputRange: [-30, area.h + 30], outputRange: ['0deg', piece.spin] })} />
+      ))}
+    </Block>
+  );
+}
+
+function SolitaireScreen() {
+  const insets = useSafeAreaInsets();
+  const window = useWindowDimensions();
+  const [game, setGame] = useState<GameState>(() => createGame());
+  const [score, setScore] = useState(0);
+  const [history, setHistory] = useState<Snapshot[]>([]);
+  const [selected, setSelected] = useState<Source | null>(null);
+  const [hint, setHint] = useState<Hint | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [shake, setShake] = useState<{ key: string; n: number }>({ key: '', n: 0 });
+  const [seconds, setSeconds] = useState(0);
+  const [area, setArea] = useState<Box | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [rulesOpen, setRulesOpen] = useState(false);
+  const [winClosed, setWinClosed] = useState(false);
+  const [autoMove, setAutoMove] = useState(true);
+  const [leftHanded, setLeftHanded] = useState(false);
+  const [finishing, setFinishing] = useState(false);
+
+  const won = isWon(game);
+  const started = game.moves > 0;
+  const rail = window.width > window.height && window.height < 560;
+  const canFinish = !won && !game.stock.length && !game.waste.length
+    && game.tableau.every((pile) => pile.every((card) => card.faceUp));
+
+  useEffect(() => {
+    if (!started || won) return;
+    const timer = setInterval(() => setSeconds((value) => value + 1), 1000);
+    return () => clearInterval(timer);
+  }, [started, won]);
+
+  useEffect(() => {
+    if (!notice && !hint) return;
+    const timer = setTimeout(() => { setNotice(null); setHint(null); }, 2600);
+    return () => clearTimeout(timer);
+  }, [notice, hint]);
+
+  useEffect(() => {
+    if (won) { haptic('win'); setFinishing(false); }
+  }, [won]);
+
+  useEffect(() => {
+    if (!finishing) return;
+    const timer = setTimeout(() => {
+      const move = foundationMove(game);
+      if (move) apply(move[0], move[1]);
+      else setFinishing(false);
+    }, 110);
+    return () => clearTimeout(timer);
+  });
+
+  function commit(next: GameState, delta: number) {
+    setHistory((items) => [...items.slice(-199), { game, score }]);
+    setGame(next);
+    setScore((value) => Math.max(0, value + delta));
+    setSelected(null);
+    setHint(null);
+  }
+
+  function apply(source: Source, destination: Destination): boolean {
+    const next = moveCards(game, source, destination);
+    if (!next) return false;
+    commit(next, moveScore(game, source, destination));
+    haptic('tap');
+    return true;
+  }
+
+  function reject(key: string, text?: string) {
+    setShake((value) => ({ key, n: value.n + 1 }));
+    if (text) setNotice(text);
+    haptic('error');
+  }
+
+  function tapSource(source: Source, key: string, asDestination?: Destination) {
+    if (selected) {
+      if (asDestination && apply(selected, asDestination)) return;
+      if (sameSource(selected, source)) { setSelected(null); return; }
+    }
+    const cards = sourceCards(game, source);
+    if (!cards) {
+      if (selected) reject(key);
+      return;
+    }
+    if (autoMove) {
+      const destination = bestDestination(game, source);
+      if (destination) apply(source, destination);
+      else reject(key, `No move for ${cardLabel(cards[0])}.`);
+      return;
+    }
+    setSelected(source);
+  }
+
+  function tapEmpty(destination: Destination) {
+    if (selected && !apply(selected, destination)) {
+      setNotice(destination.pile === 'tableau' ? 'Only a king can fill an empty column.'
+        : `Foundations start with an ace of ${destination.suit}.`);
+    }
+  }
+
+  function tapStock() {
+    const next = drawStock(game);
+    if (!next) return;
+    commit(next, game.stock.length ? 0 : -100);
+    haptic('tap');
+  }
+
+  function undo() {
+    const previous = history.at(-1);
+    if (!previous) return;
+    setGame(previous.game);
+    setScore(previous.score);
+    setHistory((items) => items.slice(0, -1));
+    setSelected(null);
+    setHint(null);
+    setFinishing(false);
+  }
+
+  function newGame() {
+    setGame(createGame());
+    setScore(0);
+    setHistory([]);
+    setSelected(null);
+    setHint(null);
+    setSeconds(0);
+    setWinClosed(false);
+    setFinishing(false);
+    setMenuOpen(false);
+  }
+
+  function showHint() {
+    const next = findHint(game);
+    setSelected(null);
+    if (next) {
+      setHint(next);
+      setNotice(next.text);
+    } else {
+      setNotice(game.stock.length ? 'Draw from the stock.' : game.waste.length ? 'Recycle the waste pile.'
+        : 'No moves left. Try a new game.');
+    }
+  }
+
+  function measure(event: LayoutChangeEvent) {
+    const { width, height } = event.nativeEvent.layout;
+    if (!area || Math.abs(area.w - width) > 1 || Math.abs(area.h - height) > 1) setArea({ w: width, h: height });
+  }
+
+  const layout = area ? tableLayout(area, game, rail) : null;
+  const specs: CardSpec[] = [];
+  const slots: ReactNode[] = [];
+  const marked = selected ?? hint?.source ?? null;
+  const targetFor = (destination: Destination) =>
+    (selected && canMove(game, selected, destination)) || sameDestination(hint?.destination, destination)
+      ? C.target : undefined;
+
+  if (layout) {
+    const { cardW: w, cardH: h, x, top, tableauTop } = layout;
+    const topX = (column: number) => x(leftHanded ? 6 - column : column);
+    const fan = Math.round(w * 0.24) * (leftHanded ? -1 : 1);
+
+    SUITS.forEach((suit, index) => {
+      const pile = game.foundations[suit];
+      const destination: Destination = { pile: 'foundation', suit };
+      const ring = targetFor(destination);
+      slots.push(
+        <Slot key={suit} x={topX(index)} y={top} w={w} h={h} ring={pile.length ? undefined : ring}
+          label={pile.length ? undefined : `Empty ${suit} foundation`} onPress={pile.length ? undefined : () => tapEmpty(destination)}>
+          <Text c={C.slotInk} size={Math.round(w * 0.5)} lh={1}>{SUIT_SYMBOL[suit]}</Text>
+        </Slot>,
+      );
+      pile.forEach((card, cardIndex) => {
+        const isTop = cardIndex === pile.length - 1;
+        const source: Source = { pile: 'foundation', suit };
+        specs.push({
+          card, x: topX(index), y: top, z: cardIndex + 1, flat: !isTop,
+          label: `${suit} foundation, ${cardLabel(card)}`,
+          ring: isTop ? (sameSource(marked, source) ? C.gold : ring) : undefined,
+          onPress: isTop ? () => tapSource(source, `${card.suit}-${card.rank}`, destination) : undefined,
+        });
+      });
+    });
+
+    slots.push(
+      <Slot key="stock" x={topX(6)} y={top} w={w} h={h}
+        label={game.stock.length ? undefined : game.waste.length ? 'Recycle waste pile' : 'Empty stock'}
+        onPress={game.waste.length ? tapStock : undefined}>
+        {game.waste.length ? <IconRefresh size={Math.round(w * 0.42)} color={C.slotInk} /> : null}
+      </Slot>,
+    );
+    game.stock.forEach((card, index) => specs.push({
+      card, x: topX(6), y: top, z: index + 1, flat: index < game.stock.length - 1,
+      label: index === game.stock.length - 1 ? `Stock, ${game.stock.length} cards. Draw a card.` : undefined,
+      onPress: index === game.stock.length - 1 ? tapStock : undefined,
+    }));
+
+    game.waste.forEach((card, index) => {
+      const depth = Math.min(2, game.waste.length - 1 - index);
+      const isTop = index === game.waste.length - 1;
+      specs.push({
+        card, x: topX(5) - depth * fan, y: top, z: index + 1, flat: index < game.waste.length - 3,
+        label: `Waste, ${cardLabel(card)}`,
+        ring: isTop && sameSource(marked, { pile: 'waste' }) ? C.gold : undefined,
+        onPress: isTop ? () => tapSource({ pile: 'waste' }, `${card.suit}-${card.rank}`) : undefined,
+      });
+    });
+
+    game.tableau.forEach((pile, column) => {
+      const destination: Destination = { pile: 'tableau', column };
+      const ring = targetFor(destination);
+      slots.push(
+        <Slot key={`column-${column}`} x={x(column)} y={tableauTop} w={w} h={h} ring={pile.length ? undefined : ring}
+          label={pile.length ? undefined : `Empty column ${column + 1}`} onPress={pile.length ? undefined : () => tapEmpty(destination)}>
+          <Text c={C.slotInk} fw="bold" size={Math.round(w * 0.36)}>K</Text>
+        </Slot>,
+      );
+      pile.forEach((card, cardIndex) => {
+        const source: Source = { pile: 'tableau', column, cardIndex };
+        const inMarked = marked?.pile === 'tableau' && marked.column === column && cardIndex >= marked.cardIndex;
+        const isTop = cardIndex === pile.length - 1;
+        specs.push({
+          card, x: x(column), y: tableauTop + layout.columns[column][cardIndex], z: cardIndex + 1,
+          label: card.faceUp ? `Column ${column + 1}, ${cardLabel(card)}` : `Column ${column + 1}, face-down card`,
+          ring: inMarked ? C.gold : isTop ? ring : undefined,
+          onPress: card.faceUp ? () => tapSource(source, `${card.suit}-${card.rank}`, destination)
+            : selected ? () => tapEmpty(destination) : undefined,
+        });
+      });
+    });
+  }
+
+  const wide = window.width >= 700;
+  const actions = (
+    <>
+      <Action icon={IconCards} label="New" onPress={newGame} />
+      <Action icon={IconArrowBackUp} label="Undo" onPress={undo} disabled={!history.length || finishing} />
+      <Action icon={IconBulb} label="Hint" onPress={showHint} disabled={won || finishing} />
+      <Action icon={IconMenu2} label="Menu" onPress={() => setMenuOpen(true)} />
+    </>
+  );
+
+  return (
+    <Gradient colors={C.felt} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} fluid>
+      <StatusBar barStyle="light-content" />
+      <Block bg={C.bar} borderBottomWidth={1} borderBottomColor={C.hairline} gap={0}
+        pt={insets.top} pl={insets.left} pr={insets.right}>
+        <Block direction="row" align="center" justify={wide ? 'space-between' : 'center'} h={rail ? 44 : 54}
+          px={16} gap="md" w="100%" maw={1100} alignSelf="center">
+          {wide && (
+            <Text c={C.text} fw="bold" size={18} lts={0.3} miw={140}>
+              Solitaire
+            </Text>
+          )}
+          <Block direction="row" align="center" justify="center" gap={wide ? 'xl' : 'md'}>
+            <Stat label="SCORE" value={String(score)} />
+            <Stat label="TIME" value={formatTime(seconds)} />
+            <Stat label="MOVES" value={String(game.moves)} />
+          </Block>
+          {wide && (
+            <Text c={C.muted} size={13} ta="right" miw={140}>
+              {SUITS.reduce((total, suit) => total + game.foundations[suit].length, 0)} / 52 home
+            </Text>
+          )}
+        </Block>
+      </Block>
+
+      <Block fluid direction="row" gap={0} pl={rail ? insets.left : 0}>
+        <Block fluid gap={0} onLayout={measure}>
+          {area && layout && (
+            <ScrollArea showsVerticalScrollIndicator={false}>
+              <Block w={layout.width} h={layout.height} alignSelf="center" position="relative" gap={0}>
+                {slots}
+                {specs.map((spec) => {
+                  const key = `${spec.card.suit}-${spec.card.rank}`;
+                  return (
+                    <TableCard key={key} spec={spec} w={layout.cardW} h={layout.cardH} rankSize={layout.rankSize}
+                      inset={layout.inset} shake={shake.key === key ? shake.n : 0} />
+                  );
+                })}
+              </Block>
+            </ScrollArea>
+          )}
+          {(notice || canFinish) && (
+            <Block position="absolute" left={0} right={0} bottom={12} align="center" gap={0} zIndex={1500}
+              pointerEvents="box-none">
+              {canFinish && !finishing ? (
+                <Button title="Auto-finish" icon={<IconBolt size={18} color={C.black} />} variant="filled"
+                  color={C.gold} textColor={C.black} radius="full" onPress={() => setFinishing(true)} />
+              ) : notice ? (
+                <Block bg="rgba(8, 14, 12, 0.86)" radius="full" px={16} py={9} maw={360} mx={16}>
+                  <Text c={C.text} size={14} ta="center" accessibilityLiveRegion="polite">
+                    {notice}
+                  </Text>
+                </Block>
+              ) : null}
+            </Block>
+          )}
+          {won && area && <Confetti area={area} />}
+        </Block>
+        {rail && (
+          <Block w={84 + insets.right} pr={insets.right} py={8} px={6} gap={4} bg={C.bar}
+            borderLeftWidth={1} borderLeftColor={C.hairline} justify="center">
+            {actions}
+          </Block>
+        )}
+      </Block>
+
+      {!rail && (
+        <Block bg={C.bar} borderTopWidth={1} borderTopColor={C.hairline} gap={0}
+          pb={Math.max(insets.bottom, 6)} pl={insets.left} pr={insets.right}>
+          <Block direction="row" gap={4} px={8} pt={6} w="100%" maw={560} alignSelf="center">
+            {actions}
+          </Block>
+        </Block>
+      )}
+
+      <Dialog opened={menuOpen} variant="bottomsheet" title="Game" accessibilityLabel="Game menu"
+        onClose={() => setMenuOpen(false)}>
+        <Block gap="lg" pb={Math.max(insets.bottom, 12)}>
+          <Switch label="Tap to auto-move" checked={autoMove}
+            onChange={(value) => { setAutoMove(value); setSelected(null); }} />
+          <Switch label="Left-handed table" checked={leftHanded} onChange={setLeftHanded} />
+          <Block direction="row" gap="sm">
+            <Block grow={1} basis={0}>
+              <Button title="New game" variant="filled" color={C.gold} textColor={C.black} fullWidth onPress={newGame} />
+            </Block>
+            <Block grow={1} basis={0}>
+              <Button title="How to play" variant="outline" color={C.gold} fullWidth
+                onPress={() => { setMenuOpen(false); setRulesOpen(true); }} />
+            </Block>
+          </Block>
+        </Block>
+      </Dialog>
+
+      <Dialog opened={rulesOpen} title="How to play" accessibilityLabel="How to play" onClose={() => setRulesOpen(false)}>
+        <Block gap="sm">
+          <Text lh={1.5}>Move every card to the four foundations, building each suit up from ace to king.</Text>
+          <Text lh={1.5}>Build tableau columns down in alternating colors. Only a king can fill an empty column.</Text>
+          <Text lh={1.5}>
+            Tap the stock to draw one card; tap the empty stock to recycle the waste. With auto-move on, tapping a
+            card sends it to the best legal spot. Turn it off in the menu to tap a card, then its destination.
+          </Text>
+        </Block>
+      </Dialog>
+
+      <Dialog opened={won && !winClosed} accessibilityLabel="You won" showHeader={false} onClose={() => setWinClosed(true)}>
+        <Block align="center" gap="md" py="md">
+          <Block w={64} h={64} radius="full" bg="rgba(255, 201, 60, 0.18)" align="center" justify="center">
+            <IconTrophy size={34} color={C.gold} />
+          </Block>
+          <Text size={26} fw="bold" ta="center">
+            You won!
+          </Text>
+          <Block direction="row" gap="xl" justify="center">
+            {[['SCORE', String(score)], ['TIME', formatTime(seconds)], ['MOVES', String(game.moves)]].map(([label, value]) => (
+              <Block key={label} align="center" gap={2}>
+                <Text c="secondary" size={11} fw="bold" lts={1.2}>{label}</Text>
+                <Text size={20} fw="bold">{value}</Text>
+              </Block>
+            ))}
+          </Block>
+          <Button title="Play again" variant="filled" color={C.gold} textColor={C.black} fullWidth onPress={newGame} />
+        </Block>
+      </Dialog>
+    </Gradient>
   );
 }
 
 export default function App() {
   return (
     <SafeAreaProvider>
-      <PlocksProvider theme={GAME_THEME}>
+      <PlocksProvider theme={{ colorScheme: 'dark' }}>
         <SolitaireScreen />
       </PlocksProvider>
     </SafeAreaProvider>

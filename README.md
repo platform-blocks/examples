@@ -23,7 +23,7 @@ The other app package names are in their respective `package.json` files. The na
 
 ## Explore web demos
 
-From the sibling `plocks` checkout, run `npm run site:build-with-demos` to build the docs gallery with all 28 live web demos and browsable source pages. Serve `plocks/apps/docs/dist` as a static site; the gallery is at `/examples/`, with each app at `/demos/<app>/` and its source at `/demos/<app>/source.html`.
+From the sibling `plocks` checkout, run `npm run site:build-with-demos` to build the docs gallery with all 18 live web demos and browsable source pages. Serve `plocks/apps/docs/dist` as a static site; the gallery is at `/examples/`, with each app at `/demos/<app>/` and its source at `/demos/<app>/source.html`.
 
 To export the apps without building the docs, run `npm run web:export -- <output-directory>`. Pass an optional app slug as the second argument to export a single app.
 
@@ -46,4 +46,4 @@ Run `npm run validate:ui` to check every app and generated Snack for direct nati
 
 Run `npm run snack:generate` to refresh `snacks/` and `snack-manifest.json`. This creates Snack-ready copies of all apps with an `App.tsx` entry: imports use `@plocks/ui-snack`, and local media files are included. After generating, copy `snack-manifest.json` to `plocks/apps/docs/config/appSnackManifest.json`. The docs site uses that manifest to build Snack links that load these files from GitHub raw URLs. Snack runs on Expo SDK 54, so it uses published plocks packages rather than the local checkout. The gallery exposes native Snack links only for apps verified on that SDK; generated source bundles for the others are not yet native previews.
 
-All 28 current apps have an `App.tsx` entry and a generated Snack source bundle.
+All 18 current apps have an `App.tsx` entry and a generated Snack source bundle.

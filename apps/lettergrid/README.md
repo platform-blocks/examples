@@ -2,7 +2,9 @@
 
 A five-letter word game with six guesses and position-aware color clues.
 
-This standalone Expo example uses `@plocks/ui` components with a light or dark `PlocksProvider` theme. Its main interaction lives in [`App.tsx`](./App.tsx).
+The board sizes itself to fill the screen above an on-screen keyboard whose keys take the best clue found for each letter. On web, the physical keyboard works too. Tiles pop as you type and flip in turn to reveal their colors; a short message reports short guesses, a win or the answer. Use the header buttons to start a new puzzle or switch between light and dark themes.
+
+This standalone Expo example uses `@plocks/ui` components with a `PlocksProvider` theme. Its main interaction lives in [`App.tsx`](./App.tsx).
 
 ## Run
 

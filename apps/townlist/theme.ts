@@ -1,0 +1,31 @@
+/** Townlist palette: utilitarian classifieds look with purple links. */
+export const C = {
+  purple: '#5B2A8C',
+  purpleDark: '#43206A',
+  link: '#5B2A8C',
+  visited: '#7A4BA8',
+  ink: '#1F1D22',
+  body: '#33303A',
+  muted: '#6E6A75',
+  faint: '#9A96A0',
+  line: '#E3E0E7',
+  lineStrong: '#CFCAD6',
+  pale: '#F6F4F9',
+  paler: '#FBFAFD',
+  tint: '#EEE8F5',
+  white: '#FFFFFF',
+  green: '#1F6B45',
+  greenPale: '#E6F2EA',
+  amber: '#8A5A00',
+  amberPale: '#FBF1DC',
+  red: '#A3283B',
+  redPale: '#F9E6E9',
+  map: '#ECEFE6',
+  mapRoad: '#FFFFFF',
+  mapWater: '#D6E4EE',
+  mapPark: '#D9E8D2',
+  bubbleMe: '#5B2A8C',
+  bubbleThem: '#F0EEF3',
+};
+
+export const WIDE = 880;

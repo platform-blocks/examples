@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Animated, PanResponder, StatusBar, useWindowDimensions } from 'react-native';
+import { Animated, PanResponder, Platform, StatusBar, useWindowDimensions } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import {
@@ -9,6 +9,7 @@ import {
   ScrollArea,
   SafeArea,
   Block,
+  BottomAppBar,
   Button,
   Dialog,
   Icon,
@@ -93,21 +94,28 @@ const C = {
   bg: '#F6FAFB',
 };
 const STORAGE = 'plocks-fish-dating:v1';
+const TABS = [
+  { key: 'discover', label: 'Discover', icon: 'heart' },
+  { key: 'matches', label: 'Matches', icon: 'bolt' },
+  { key: 'chats', label: 'Chats', icon: 'message' },
+] as const;
+// Native pins the bar over the content's bottom edge; web keeps it in flow.
+const BAR_CLEARANCE = Platform.OS === 'web' ? 0 : 57;
 
-function FishPortrait({ fish, small = false }: { fish: Fish; small?: boolean }) {
+function FishPortrait({ fish, small = false, size = 58 }: { fish: Fish; small?: boolean; size?: number }) {
   return (
     <Gradient
       colors={[fish.colors[0], fish.colors[1]]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
-      w={small ? 58 : '100%'}
-      h={small ? 58 : '100%'}
-      radius={small ? 29 : 22}
+      w={small ? size : '100%'}
+      h={small ? size : '100%'}
+      radius={small ? size / 2 : 22}
       align="center"
       justify="center"
       overflow="hidden"
     >
-      <Text size={small ? 31 : 140} lh={small ? 48 : 185}>
+      <Text size={small ? size * 0.53 : 140} lh={small ? size * 0.83 : 185}>
         {fish.emoji}
       </Text>
       {!small && (
@@ -187,6 +195,11 @@ function FinsterScreen() {
     },
   });
 
+  function changeTab(item: string) {
+    setTab(item as Tab);
+    setActiveChat(null);
+  }
+  const unread = matches.filter((id) => !chats[id]?.length).length;
   const nav = (
     <Tabs
       navigationOnly
@@ -194,22 +207,33 @@ function FinsterScreen() {
       variant="chip"
       color={C.teal}
       value={tab}
-      onChange={(item) => {
-        setTab(item as Tab);
-        setActiveChat(null);
-      }}
-      items={(['discover', 'matches', 'chats'] as const).map((item) => ({
-        key: item,
-        label: item[0].toUpperCase() + item.slice(1),
-        subLabel: item === 'matches' && matches.length ? String(matches.length) : undefined,
-        icon: (
-          <Icon
-            name={item === 'discover' ? 'heart' : item === 'matches' ? 'bolt' : 'message'}
-            color={tab === item ? C.white : C.muted}
-            size={wide ? 23 : 20}
-          />
-        ),
+      onChange={changeTab}
+      items={TABS.map((item) => ({
+        key: item.key,
+        label: item.label,
+        subLabel: item.key === 'matches' && matches.length ? String(matches.length) : undefined,
+        icon: <Icon name={item.icon} color={tab === item.key ? C.white : C.muted} size={23} />,
         content: null,
+      }))}
+    />
+  );
+  const bottomNav = (
+    <BottomAppBar
+      accessibilityLabel="Main"
+      activeKey={tab}
+      onItemPress={changeTab}
+      bg={C.white}
+      borderColor={C.line}
+      activeColor={C.coral}
+      inactiveColor={C.muted}
+      indicator="#FFE8EC"
+      items={TABS.map((item) => ({
+        key: item.key,
+        label: item.label,
+        badgeCount: item.key === 'chats' ? unread : undefined,
+        icon: ({ active, color }) => (
+          <Icon name={item.icon} variant={active ? 'filled' : 'outlined'} color={color} size={24} />
+        ),
       }))}
     />
   );
@@ -230,8 +254,8 @@ function FinsterScreen() {
             </Text>
           </Block>
         )}
-        <Block gap={0} flex={1}>
-          {!wide && (
+        <Block gap={0} flex={1} pb={!wide && !active ? BAR_CLEARANCE : 0}>
+          {!wide && !active && (
             <Block gap={0} h={60} direction="row" justify="space-between" align="center" px={20}>
               <Text c={C.teal} fw="bold" size={27}>
                 finster 🐠
@@ -380,7 +404,9 @@ function FinsterScreen() {
                     direction="row"
                     align="center"
                     gap={10}
-                    p={12}
+                    h={60}
+                    px={8}
+                    bg={C.white}
                     borderBottomWidth={1}
                     borderBottomColor={C.line}
                   >
@@ -391,10 +417,15 @@ function FinsterScreen() {
                       accessibilityLabel="Back to chats"
                       onPress={() => setActiveChat(null)}
                     />
-                    <FishPortrait fish={active} small />
-                    <Text c={C.sea} fw="bold" size={18}>
-                      {active.name}
-                    </Text>
+                    <FishPortrait fish={active} small size={40} />
+                    <Block gap={0}>
+                      <Text c={C.sea} fw="bold" size={16}>
+                        {active.name}
+                      </Text>
+                      <Text c={C.muted} size={12}>
+                        {active.species}
+                      </Text>
+                    </Block>
                   </Block>
                   <ScrollArea flex={1} contentProps={{ p: 18, gap: 12, justify: 'flex-end', grow: 1 }}>
                     <Block gap={0} alignSelf="flex-start" p={13} radius={16} bg={C.white} maw="82%">
@@ -476,11 +507,7 @@ function FinsterScreen() {
               )}
             </Block>
           )}
-          {!wide && !active && (
-            <Block gap={0} bg={C.white} borderTopWidth={1} borderTopColor={C.line}>
-              {nav}
-            </Block>
-          )}
+          {!wide && !active && bottomNav}
         </Block>
       </Block>
       {matchPop && (

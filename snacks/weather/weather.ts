@@ -75,7 +75,13 @@ export async function getWeather(city: City, signal?: AbortSignal): Promise<Weat
     forecast_hours: '12',
   });
 
-  const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`, { signal });
+  let response: Response;
+  try {
+    response = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`, { signal });
+  } catch (cause) {
+    if (signal?.aborted) throw cause;
+    throw new Error('Couldn’t reach the weather service. Check your connection and try again.');
+  }
   if (!response.ok) throw new Error('Weather service is unavailable. Please try again.');
 
   const data = await response.json();

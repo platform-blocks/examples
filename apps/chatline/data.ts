@@ -3,6 +3,7 @@ export type Message = {
   text: string;
   time: string;
   outgoing: boolean;
+  reaction?: string;
 };
 
 export type Chat = {
