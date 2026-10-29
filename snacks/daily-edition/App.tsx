@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { StatusBar, useWindowDimensions } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { BackgroundImage, Chip, Input, ScrollArea, SafeArea, Image, Block, Icon, PlocksProvider, Tabs, Text } from '@plocks/ui-snack';
+import { Chip, Input, ScrollArea, SafeArea, Image, Block, Icon, PlocksProvider, Text } from '@plocks/ui-snack';
 
 const C = {
   paper: '#F7F5F0',
@@ -167,28 +167,49 @@ const STORIES: Story[] = [
   },
 ];
 const STORAGE = 'plocks-daily-edition:v2';
+const TODAY = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+const TABS: Tab[] = ['Today', 'Latest', 'Sections', 'Saved'];
+const DATELINE = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
 function Rule({ heavy = false }: { heavy?: boolean }) {
   return <Block gap={0} h={heavy ? 2 : 1} bg={heavy ? C.ink : C.rule} />;
 }
-function Kicker({ children }: { children: string }) {
+function Kicker({ children, color = C.blue }: { children: string; color?: string }) {
   return (
-    <Text c={C.blue} fw="bold" size={10} lts={1.5}>
+    <Text c={color} fw="bold" size={10} lts={1.5}>
       {children.toUpperCase()}
     </Text>
   );
 }
+function SectionHead({ children }: { children: string }) {
+  return (
+    <Block gap={8}>
+      <Rule heavy />
+      <Kicker color={C.ink}>{children}</Kicker>
+    </Block>
+  );
+}
+function Art({ index, ratio, w = '100%' }: { index: number; ratio: number; w?: number | `${number}%` }) {
+  return (
+    <Block gap={0} w={w} aspectRatio={ratio} bg={C.pale} overflow="hidden">
+      <Image source={ART[index]} w="100%" h="100%" resizeMode="cover" />
+    </Block>
+  );
+}
 function Ad({ compact = false }: { compact?: boolean }) {
   return (
-    <Block align="center" py={compact ? 18 : 31} gap={9} borderTopWidth={1} borderBottomWidth={1} borderColor={C.rule}>
+    <Block align="center" py={compact ? 20 : 28} gap={8}>
       <Text c={C.muted} size={9} lts={1.8}>
-        ADVERTISEMENT · DEMO PLACEMENT
+        ADVERTISEMENT
       </Text>
       <Block
         w="100%"
-        maw={compact ? 360 : 720}
-        mih={compact ? 92 : 130}
-        bg="#DFE8E4"
+        maw={compact ? 420 : 728}
+        mih={compact ? 96 : 120}
+        bg={C.pale}
+        borderWidth={1}
+        borderColor={C.rule}
         p={18}
         justify="center"
         align="center"
@@ -197,7 +218,7 @@ function Ad({ compact = false }: { compact?: boolean }) {
         <Text c={C.blue} fw="bold" size={11} lts={2}>
           NORTHLINE
         </Text>
-        <Text c={C.ink} size={compact ? 17 : 21} ff="Georgia" lts={-0.5}>
+        <Text c={C.ink} size={compact ? 18 : 22} ff="Georgia" ta="center">
           Make room for the next journey.
         </Text>
         <Text c={C.muted} size={10}>
@@ -261,102 +282,152 @@ function NewsScreen() {
   const saveButton = (story: Story) => (
     <Block
       gap={0}
-      onPress={(event) => {
-        event.stopPropagation();
-        toggleSave(story.id);
-      }}
+      onPress={() => toggleSave(story.id)}
       accessibilityRole="button"
       accessibilityLabel={saved.includes(story.id) ? `Remove ${story.title} from saved` : `Save ${story.title}`}
       p={8}
-      mr={-8}
+      m={-8}
     >
       <Icon
         name="bookmark"
         variant={saved.includes(story.id) ? 'filled' : 'outlined'}
         color={saved.includes(story.id) ? C.blue : C.muted}
-        size={21}
+        size={20}
       />
     </Block>
   );
+  const meta = (story: Story) => (
+    <Text c={C.muted} size={11}>
+      {story.time} · {story.minutes} min read
+    </Text>
+  );
+  // The row and its bookmark are sibling buttons; nesting them is invalid on web.
   const storyRow = (story: Story, index: number) => (
+    <Block
+      key={story.id}
+      py={18}
+      borderTopWidth={index === 0 ? 0 : 1}
+      borderColor={C.rule}
+      direction="row"
+      gap={wide ? 24 : 14}
+      align="flex-start"
+    >
+      <Block
+        onPress={() => openStory(story)}
+        accessibilityRole="button"
+        accessibilityLabel={`Read ${story.title}`}
+        flex={1}
+        direction="row"
+        gap={wide ? 24 : 14}
+        align="flex-start"
+      >
+        <Block flex={1} gap={6}>
+          <Kicker>{story.section}</Kicker>
+          <Text c={read.includes(story.id) ? C.muted : C.ink} size={wide ? 22 : 18} ff="Georgia" lh={wide ? 27 : 23}>
+            {story.title}
+          </Text>
+          {wide && (
+            <Text c={C.muted} size={14} numberOfLines={2} lh={20}>
+              {story.deck}
+            </Text>
+          )}
+          {meta(story)}
+        </Block>
+        <Art index={story.image} w={wide ? 168 : 96} ratio={wide ? 1.5 : 1} />
+      </Block>
+      {saveButton(story)}
+    </Block>
+  );
+  const storyCard = (story: Story) => (
     <Block
       key={story.id}
       onPress={() => openStory(story)}
       accessibilityRole="button"
       accessibilityLabel={`Read ${story.title}`}
-      py={17}
-      borderTopWidth={index === 0 ? 2 : 1}
-      borderColor={index === 0 ? C.ink : C.rule}
-      direction="row"
-      gap={17}
-      align="flex-start"
+      flex={1}
+      gap={8}
     >
-      <Block flex={1} gap={6}>
+      <Art index={story.image} ratio={1.5} />
+      <Block gap={6} pt={4}>
         <Kicker>{story.section}</Kicker>
-        <Text c={C.ink} size={wide ? 22 : 19} ff="Georgia" lts={-0.5} lh={wide ? 27 : 24}>
+        <Text c={read.includes(story.id) ? C.muted : C.ink} size={20} ff="Georgia" lh={25}>
           {story.title}
         </Text>
-        <Text c={C.muted} size={13} numberOfLines={2} lh={19}>
+        <Text c={C.muted} size={14} numberOfLines={3} lh={20}>
           {story.deck}
         </Text>
-        <Block direction="row" align="center" gap={7}>
-          <Text c={C.muted} size={10}>
-            {story.time} · {story.minutes} min read
-          </Text>
-          {read.includes(story.id) && (
-            <Text c={C.blue} size={10}>
-              · Read
-            </Text>
-          )}
-        </Block>
+        {meta(story)}
       </Block>
-      <Image source={ART[story.image]} w={wide ? 170 : 112} h={wide ? 118 : 92} bg={C.pale} resizeMode="cover" />
-      {wide && saveButton(story)}
     </Block>
   );
   const lead = STORIES[0];
+  const briefing = STORIES.slice(1, 5);
+  const explore = STORIES.slice(5);
   return (
     <SafeArea gap={0} flex={1} bg={C.paper}>
       <StatusBar barStyle="dark-content" />
       <Block gap={0} bg={C.white} borderBottomWidth={1} borderBottomColor={C.rule}>
         <Block gap={0} maw={1120} w="100%" alignSelf="center" px={wide ? 24 : 16}>
-          <Block gap={0} direction="row" justify="space-between" pt={10} pb={8}>
-            <Text c={C.muted} size={10} lts={1}>
-              THE DAILY EDITION
-            </Text>
-            <Text c={C.muted} size={10}>
-              FICTIONAL NEWS DEMO
-            </Text>
-          </Block>
-          <Rule heavy />
-          <Block gap={0} mih={wide ? 77 : 68} direction="row" align="center" justify="space-between">
+          <Block gap={0} direction="row" align="center" justify="space-between" mih={wide ? 92 : 64}>
+            <Block gap={0} flex={1}>
+              {wide && (
+                <Text c={C.muted} size={11}>
+                  {DATELINE}
+                </Text>
+              )}
+            </Block>
             <Block
-              onPress={() => {
-                chooseTab('Today');
-              }}
+              onPress={() => chooseTab('Today')}
               accessibilityRole="button"
-              accessibilityLabel="Go to today edition"
+              accessibilityLabel="Go to today’s edition"
               direction="row"
               align="center"
               gap={9}
             >
-              <Block gap={0} w={10} h={10} radius={5} bg={C.gold} />
-              <Text c={C.ink} size={wide ? 34 : 27} fw="bold" ff="Georgia" lts={-1.4}>
+              <Block gap={0} w={9} h={9} radius={5} bg={C.gold} />
+              <Text c={C.ink} size={wide ? 40 : 26} fw="bold" ff="Georgia" lts={wide ? -1.2 : -0.8}>
                 The Daily Edition
               </Text>
             </Block>
-            <Block
-              gap={0}
-              onPress={() => {
-                setSelected(null);
-                setSearchOpen((old) => !old);
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="Search stories"
-              p={8}
-            >
-              <Icon name="search" color={C.ink} size={22} />
+            <Block gap={0} flex={1} align="flex-end">
+              <Block
+                gap={0}
+                onPress={() => {
+                  setSelected(null);
+                  setSearchOpen((old) => !old);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={searchOpen ? 'Close search' : 'Search stories'}
+                p={8}
+                mr={-8}
+              >
+                <Icon name={searchOpen ? 'x' : 'search'} color={C.ink} size={21} />
+              </Block>
             </Block>
+          </Block>
+          <Rule heavy />
+          <Block gap={0} direction="row" justify={wide ? 'center' : 'space-between'}>
+            {TABS.map((item) => {
+              const current = tab === item && !active;
+              return (
+                <Block
+                  key={item}
+                  gap={0}
+                  onPress={() => chooseTab(item)}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: current }}
+                  px={wide ? 18 : 4}
+                  pt={12}
+                  pb={10}
+                  borderBottomWidth={2}
+                  borderBottomColor={current ? C.ink : 'transparent'}
+                >
+                  <Text c={current ? C.ink : C.muted} fw={current ? 'bold' : 'normal'} size={13}>
+                    {item === 'Saved' && saved.length ? `Saved (${saved.length})` : item}
+                  </Text>
+                </Block>
+              );
+            })}
           </Block>
           {searchOpen && (
             <Block direction="row" align="center" borderTopWidth={1} borderTopColor={C.rule} py={6} gap={9}>
@@ -375,7 +446,7 @@ function NewsScreen() {
                 accessibilityLabel="Search stories"
               />
               {!!query && (
-                <Block gap={0} onPress={() => setQuery('')} accessibilityLabel="Clear search">
+                <Block gap={0} onPress={() => setQuery('')} accessibilityRole="button" accessibilityLabel="Clear search">
                   <Text c={C.blue} size={13}>
                     Clear
                   </Text>
@@ -383,199 +454,178 @@ function NewsScreen() {
               )}
             </Block>
           )}
-          <Rule />
-          <Tabs
-            navigationOnly
-            scrollable
-            value={tab}
-            onChange={(item) => chooseTab(item as Tab)}
-            color={C.blue}
-            items={(['Today', 'Latest', 'Sections', 'Saved'] as Tab[]).map((item) => ({ key: item, label: item, content: null }))}
-          />
         </Block>
       </Block>
       <ScrollArea
         key={`${selected ?? tab}-${section}`}
-        contentProps={{ maw: 1120, w: '100%', alignSelf: 'center', px: wide ? 24 : 16, pb: 80 }}
+        contentProps={{ maw: 1120, w: '100%', alignSelf: 'center', px: wide ? 24 : 16, pb: 40 }}
       >
         {active ? (
-          <Block w="100%" maw={780} alignSelf="center" pt={20} gap={15}>
+          <Block w="100%" maw={760} alignSelf="center" pt={wide ? 28 : 18} gap={16}>
             <Block
               onPress={() => setSelected(null)}
               accessibilityRole="button"
               accessibilityLabel="Back to stories"
+              alignSelf="flex-start"
               direction="row"
-              gap={7}
+              gap={6}
               align="center"
             >
-              <Icon name="arrowLeft" color={C.blue} size={18} />
+              <Icon name="arrowLeft" color={C.blue} size={16} />
               <Text c={C.blue} size={13}>
-                Back to stories
+                {tab === 'Today' ? 'Today’s Edition' : tab}
               </Text>
             </Block>
-            <Kicker>{active.section}</Kicker>
-            <Text c={C.ink} size={wide ? 42 : 34} ff="Georgia" lts={-0.5} lh={wide ? 48 : 40}>
-              {active.title}
-            </Text>
-            <Text c={C.muted} size={wide ? 19 : 17} lh={25}>
-              {active.deck}
-            </Text>
-            <Rule heavy />
-            <Block gap={0} direction="row" align="center" justify="space-between">
-              <Block gap={3}>
-                <Text c={C.ink} fw="bold" size={12}>
+            <Block gap={12} pt={wide ? 8 : 0}>
+              <Kicker>{active.section}</Kicker>
+              <Text c={C.ink} size={wide ? 44 : 32} ff="Georgia" lts={-0.6} lh={wide ? 50 : 38}>
+                {active.title}
+              </Text>
+              <Text c={C.muted} size={wide ? 20 : 17} ff="Georgia" lh={wide ? 28 : 24}>
+                {active.deck}
+              </Text>
+            </Block>
+            <Block gap={0} direction="row" align="center" justify="space-between" py={12} borderTopWidth={1} borderBottomWidth={1} borderColor={C.rule}>
+              <Block gap={2}>
+                <Text c={C.ink} fw="bold" size={13}>
                   By {active.byline}
                 </Text>
-                <Text c={C.muted} size={11}>
-                  {active.time} · {active.minutes} min read
-                </Text>
+                {meta(active)}
               </Block>
               {saveButton(active)}
             </Block>
-            <Image source={ART[active.image]} w="100%" aspectRatio={1.65} bg={C.pale} resizeMode="cover" />
-            <Text c={C.muted} size={10}>
-              {active.caption}
-            </Text>
-            <Block maw={650} alignSelf="center" gap={18} pt={10}>
+            <Block gap={8}>
+              <Art index={active.image} ratio={wide ? 1.8 : 1.4} />
+              <Text c={C.muted} size={11} lh={16}>
+                {active.caption}
+              </Text>
+            </Block>
+            <Block w="100%" maw={640} alignSelf="center" gap={20} pt={12}>
               {active.body.map((paragraph, index) => (
-                <Text key={index} c={C.ink} size={17} ff="Georgia" lh={29}>
+                <Text key={index} c={C.ink} size={wide ? 19 : 17} ff="Georgia" lh={wide ? 32 : 29}>
                   {paragraph}
                 </Text>
               ))}
+              <Block gap={0} w={9} h={9} radius={5} bg={C.gold} alignSelf="center" mt={4} />
             </Block>
             <Ad compact />
-            <Text c={C.ink} fw="bold" size={21} ff="Georgia" lts={-0.5}>
-              More from The Daily Edition
-            </Text>
-            {STORIES.filter((item) => item.id !== active.id)
-              .slice(0, 3)
-              .map(storyRow)}
+            <SectionHead>More from The Daily Edition</SectionHead>
+            <Block gap={0}>
+              {STORIES.filter((item) => item.id !== active.id)
+                .slice(0, 3)
+                .map(storyRow)}
+            </Block>
           </Block>
-        ) : (
-          <Block pt={22} gap={18}>
-            <Block gap={0} direction="row" align="baseline" justify="space-between">
-              <Block gap={0}>
-                <Text c={C.muted} size={10} lts={1.5}>
-                  ORIGINAL SAMPLE STORIES
+        ) : tab === 'Today' && !query ? (
+          <Block pt={wide ? 28 : 18} gap={wide ? 32 : 24}>
+            <Block direction={wide ? 'row' : 'column'} gap={wide ? 32 : 24}>
+              <Block
+                onPress={() => openStory(lead)}
+                accessibilityRole="button"
+                accessibilityLabel={`Read ${lead.title}`}
+                flex={wide ? 1.7 : undefined}
+                gap={12}
+              >
+                <Art index={lead.image} ratio={wide ? 1.6 : 1.3} />
+                <Kicker>{lead.section}</Kicker>
+                <Text c={C.ink} size={wide ? 40 : 30} ff="Georgia" lts={-0.6} lh={wide ? 45 : 35}>
+                  {lead.title}
                 </Text>
-                <Text c={C.ink} size={29} fw="bold" ff="Georgia" lts={-0.5}>
-                  {searchOpen && query ? 'Search results' : tab === 'Today' ? 'Today’s Edition' : tab}
+                <Text c={C.muted} size={wide ? 17 : 15} ff="Georgia" lh={wide ? 25 : 22}>
+                  {lead.deck}
+                </Text>
+                <Text c={C.muted} size={11}>
+                  By {lead.byline} · {lead.minutes} min read
                 </Text>
               </Block>
-              {tab === 'Saved' && (
-                <Text c={C.muted} size={12}>
-                  {saved.length} saved
-                </Text>
-              )}
-            </Block>
-            {(tab === 'Sections' || tab === 'Latest' || tab === 'Saved' || !!query) && (
-              <ScrollArea horizontal showsHorizontalScrollIndicator={false} contentProps={{ gap: 8, pb: 3 }}>
-                {SECTIONS.map((item) => (
-                  <Chip
-                    key={item}
-                    onPress={() => setSection(item)}
-                    pressed={section === item}
-                    variant={section === item ? 'filled' : 'outline'}
-                    color={C.ink}
-                    size="sm"
-                  >
-                    {item}
-                  </Chip>
-                ))}
-              </ScrollArea>
-            )}
-            {tab === 'Today' && !query && (
-              <>
-                <Rule heavy />
-                <Block direction={wide ? 'row' : 'column'} gap={23}>
+              <Block flex={wide ? 1 : undefined} gap={0} pl={wide ? 32 : 0} borderLeftWidth={wide ? 1 : 0} borderColor={C.rule}>
+                <SectionHead>The Briefing</SectionHead>
+                {briefing.map((story, index) => (
                   <Block
-                    onPress={() => openStory(lead)}
+                    key={story.id}
+                    onPress={() => openStory(story)}
                     accessibilityRole="button"
-                    accessibilityLabel={`Read ${lead.title}`}
-                    flex={1.6}
-                    gap={12}
+                    accessibilityLabel={`Read ${story.title}`}
+                    direction="row"
+                    gap={14}
+                    py={14}
+                    borderTopWidth={index === 0 ? 0 : 1}
+                    borderTopColor={C.rule}
                   >
-                    <BackgroundImage
-                      source={ART[lead.image]}
-                      w="full"
-                      aspectRatio={wide ? 1.7 : 1.45}
-                      justify="flex-end"
-                      resizeMode="cover"
-                    >
-                      <Block gap={0} alignSelf="flex-start" m={12} px={9} py={5} bg={C.white}>
-                        <Kicker>THE LEAD</Kicker>
-                      </Block>
-                    </BackgroundImage>
-                    <Text c={C.ink} size={wide ? 36 : 30} ff="Georgia" lts={-0.5} lh={wide ? 41 : 35}>
-                      {lead.title}
+                    <Text c={C.gold} size={24} ff="Georgia" lh={26} w={18}>
+                      {index + 1}
                     </Text>
-                    <Text c={C.muted} size={15} lh={22}>
-                      {lead.deck}
-                    </Text>
-                    <Text c={C.muted} size={11}>
-                      By {lead.byline} · {lead.minutes} min read
-                    </Text>
+                    <Block flex={1} gap={5}>
+                      <Kicker>{story.section}</Kicker>
+                      <Text c={read.includes(story.id) ? C.muted : C.ink} size={19} ff="Georgia" lh={24}>
+                        {story.title}
+                      </Text>
+                      {meta(story)}
+                    </Block>
                   </Block>
-                  <Block flex={1} gap={9}>
-                    <Kicker>THE BRIEFING</Kicker>
-                    <Rule heavy />
-                    {STORIES.slice(1, 4).map((story) => (
-                      <Block
-                        key={story.id}
-                        onPress={() => openStory(story)}
-                        accessibilityRole="button"
-                        gap={5}
-                        py={10}
-                        borderBottomWidth={1}
-                        borderBottomColor={C.rule}
-                      >
-                        <Kicker>{story.section}</Kicker>
-                        <Text c={C.ink} size={20} ff="Georgia" lts={-0.5} lh={25}>
-                          {story.title}
-                        </Text>
-                        <Text c={C.muted} size={11}>
-                          {story.minutes} min read
-                        </Text>
-                      </Block>
-                    ))}
-                  </Block>
-                </Block>
-                <Ad />
-                <Block gap={5}>
-                  <Text c={C.ink} size={25} fw="bold" ff="Georgia" lts={-0.5}>
-                    More to Explore
-                  </Text>
-                  <Text c={C.muted} size={12}>
-                    Ideas, places and people across the edition
-                  </Text>
-                </Block>
-                {STORIES.slice(4).map(storyRow)}
-              </>
-            )}
-            {(tab !== 'Today' || !!query) &&
-              (visible.length ? (
-                <>
-                  {visible.map(storyRow)}
-                  {visible.length > 3 && <Ad compact />}
-                </>
-              ) : (
-                <Block align="center" py={70} gap={9}>
-                  <Text c={C.ink} size={23} ff="Georgia" lts={-0.5}>
-                    {tab === 'Saved' ? 'Your reading list is empty' : 'No stories found'}
-                  </Text>
-                  <Text c={C.muted} size={13}>
-                    {tab === 'Saved' ? 'Bookmark an article to find it here.' : 'Try a different section or search.'}
-                  </Text>
-                </Block>
+                ))}
+              </Block>
+            </Block>
+            <Ad />
+            <Block gap={wide ? 20 : 0}>
+              <SectionHead>More to Explore</SectionHead>
+              {wide ? <Block direction="row" gap={32}>{explore.map(storyCard)}</Block> : <Block gap={0}>{explore.map(storyRow)}</Block>}
+            </Block>
+          </Block>
+        ) : (
+          <Block w="100%" maw={820} alignSelf="center" pt={wide ? 28 : 18} gap={16}>
+            <Block gap={0} direction="row" align="flex-end" justify="space-between">
+              <Text c={C.ink} size={wide ? 34 : 28} fw="bold" ff="Georgia" lts={-0.6}>
+                {query ? 'Search results' : tab}
+              </Text>
+              <Text c={C.muted} size={12} pb={4}>
+                {visible.length} {visible.length === 1 ? 'story' : 'stories'}
+              </Text>
+            </Block>
+            <ScrollArea horizontal showsHorizontalScrollIndicator={false} contentProps={{ gap: 8, pb: 2 }}>
+              {SECTIONS.map((item) => (
+                <Chip
+                  key={item}
+                  onPress={() => setSection(item)}
+                  pressed={section === item}
+                  variant={section === item ? 'filled' : 'outline'}
+                  color={C.ink}
+                  size="sm"
+                >
+                  {item}
+                </Chip>
               ))}
+            </ScrollArea>
+            <Rule heavy />
+            {visible.length ? (
+              <Block gap={0}>
+                {visible.map(storyRow)}
+                {visible.length > 3 && <Ad compact />}
+              </Block>
+            ) : (
+              <Block align="center" py={64} gap={8}>
+                <Icon name={tab === 'Saved' ? 'bookmark' : 'search'} color={C.muted} size={26} />
+                <Text c={C.ink} size={22} ff="Georgia" ta="center">
+                  {tab === 'Saved' && !query && section === 'All' ? 'Your reading list is empty' : 'No stories found'}
+                </Text>
+                <Text c={C.muted} size={13} ta="center">
+                  {tab === 'Saved' && !query && section === 'All'
+                    ? 'Tap the bookmark on any story to keep it here.'
+                    : 'Try a different section or search.'}
+                </Text>
+              </Block>
+            )}
           </Block>
         )}
-        <Block align="center" py={34} mt={18} borderTopWidth={1} borderTopColor={C.rule} gap={4}>
-          <Text c={C.ink} size={17} fw="bold" ff="Georgia" lts={-0.5}>
-            The Daily Edition
-          </Text>
-          <Text c={C.muted} size={10}>
-            An original, fictional editorial demo built with Plocks.
+        <Block align="center" py={32} mt={32} borderTopWidth={1} borderTopColor={C.rule} gap={6}>
+          <Block direction="row" align="center" gap={7}>
+            <Block gap={0} w={7} h={7} radius={4} bg={C.gold} />
+            <Text c={C.ink} size={17} fw="bold" ff="Georgia">
+              The Daily Edition
+            </Text>
+          </Block>
+          <Text c={C.muted} size={11} ta="center">
+            Fictional stories, bylines and sponsors · Built with plocks
           </Text>
         </Block>
       </ScrollArea>

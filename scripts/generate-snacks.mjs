@@ -67,7 +67,7 @@ for (const directory of fs.readdirSync(APPS).filter(name => fs.existsSync(path.j
         throw new Error(`${directory}/${file.name}: missing Snack source ${imported}`);
       }
     }
-    for (const match of rewritten.matchAll(/require\s*\(\s*['"](\.\/assets\/[^'"]+)['"]\s*\)/g)) {
+    for (const match of rewritten.matchAll(/require\s*\(\s*['"]((?:\.\.?\/)+assets\/[^'"]+)['"]\s*\)/g)) {
       const asset = path.posix.normalize(path.posix.join(path.posix.dirname(file.name), match[1]));
       const from = path.join(sourceDir, asset);
       if (!fs.existsSync(from)) throw new Error(`Missing asset: ${directory}/${asset}`);

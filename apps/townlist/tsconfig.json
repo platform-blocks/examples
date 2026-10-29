@@ -6,6 +6,11 @@
     "noUnusedLocals": true
   },
   "include": [
-    "App.tsx"
+    "App.tsx",
+    "theme.ts",
+    "data.ts",
+    "store.tsx",
+    "components.tsx",
+    "screens/**/*.tsx"
   ]
 }

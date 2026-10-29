@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@plocks/emoji-picker": "file:../../../plocks/packages/emoji-picker",
     "@plocks/ui": "file:../../../plocks/packages/ui",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-masked-view/masked-view": "^0.3.2",

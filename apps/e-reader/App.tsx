@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ComponentProps } from 'react';
-import { Platform, Pressable, ScrollView, StatusBar, StyleSheet, View, useWindowDimensions } from 'react-native';
-import type { DimensionValue } from 'react-native';
+import { Platform, StatusBar, useWindowDimensions } from 'react-native';
+import type { ScrollView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Speech from 'expo-speech';
-import { Highlight, Icon, PlocksProvider, SafeArea, Text } from '@plocks/ui';
+import { Block, Highlight, Icon, PlocksProvider, SafeArea, ScrollArea, Text } from '@plocks/ui';
 
 import { BOOK } from './book';
 
@@ -27,6 +27,7 @@ const STORAGE_KEY = '@plocks/e-reader/v1';
 const SPEEDS = [0.85, 1, 1.2, 1.4];
 const FONT_SIZES = [19, 22, 25];
 const SERIF = Platform.select({ ios: 'Georgia', android: 'serif', default: 'Georgia' });
+const PRESSED = { opacity: 0.6 };
 
 const LIGHT: Colors = {
   canvas: '#F2F0EA',
@@ -77,17 +78,21 @@ function SmallButton({
   active?: boolean;
 }) {
   return (
-    <Pressable
+    <Block
       onPress={onPress}
+      pressedStyle={PRESSED}
       accessibilityRole="button"
       accessibilityLabel={label}
-      style={({ pressed }) => [
-        styles.smallButton,
-        { backgroundColor: active ? colors.accentSoft : 'transparent', opacity: pressed ? 0.6 : 1 },
-      ]}
+      w={39}
+      h={39}
+      radius={12}
+      align="center"
+      justify="center"
+      gap={0}
+      bg={active ? colors.accentSoft : 'transparent'}
     >
       <Icon name={icon} size={20} color={active ? colors.accent : colors.ink} decorative />
-    </Pressable>
+    </Block>
   );
 }
 
@@ -112,31 +117,26 @@ function ReaderParagraph({
 }) {
   const words = useMemo(() => wordsIn(text), [text]);
   const marked = current && activeWord !== null ? words[activeWord] : undefined;
-  const textStyle = {
-    color: colors.ink,
-    fontFamily: SERIF,
-    fontSize,
-    lineHeight: Math.round(fontSize * 1.72),
-    letterSpacing: 0.05,
-  };
+  const type = { c: colors.ink, ff: SERIF, size: fontSize, lh: Math.round(fontSize * 1.72), lts: 0.05 };
 
   return (
-    <Pressable
+    <Block
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={'Listen from paragraph ' + (index + 1)}
       onLayout={event => onPosition(event.nativeEvent.layout.y)}
-      style={styles.paragraph}
+      mb={24}
+      gap={0}
     >
-      <Text style={textStyle}>
+      <Text {...type}>
         {marked ? (
           <>
             {text.slice(0, marked.start)}
             <Highlight
+              {...type}
               highlight={marked.text}
               highlightColor={colors.accentSoft}
-              highlightStyles={{ color: colors.ink, borderRadius: 3 }}
-              style={textStyle}
+              highlightStyles={{ color: colors.ink, borderRadius: 3, paddingHorizontal: 0, paddingVertical: 0 }}
             >
               {marked.text}
             </Highlight>
@@ -144,7 +144,7 @@ function ReaderParagraph({
           </>
         ) : text}
       </Text>
-    </Pressable>
+    </Block>
   );
 }
 
@@ -375,70 +375,81 @@ export default function App() {
       : [...items, position.chapter]);
   };
 
+  const percent = Math.round(progress * 100);
+  const firstChapter = position.chapter === 0;
+  const lastChapter = position.chapter === BOOK.chapters.length - 1;
+
   return (
     <SafeAreaProvider>
       <PlocksProvider theme={{ colorScheme: dark ? 'dark' : 'light' }}>
         <SafeArea flex={1} gap={0} bg={colors.canvas}>
           <StatusBar barStyle={dark ? 'light-content' : 'dark-content'} />
-          <View style={styles.screen}>
-            <View style={[styles.topBar, { borderBottomColor: colors.border }]}>
-              <View style={styles.topBarInner}>
-                <Pressable
+          <Block flex={1} gap={0}>
+            <Block borderBottomWidth={1} borderBottomColor={colors.border} gap={0}>
+              <Block direction="row" align="center" justify="space-between" w="100%" maw={1020} alignSelf="center" px={22} mih={72} gap={0}>
+                <Block
                   onPress={() => setShowContents(value => !value)}
                   accessibilityRole="button"
                   accessibilityLabel="Open chapter list"
-                  style={styles.brand}
+                  direction="row"
+                  align="center"
+                  gap={10}
                 >
-                  <View style={[styles.brandMark, { backgroundColor: colors.accent }]}>
-                    <Text style={styles.brandLetter}>e.</Text>
-                  </View>
-                  <View>
+                  <Block w={38} h={38} radius={11} align="center" justify="center" bg={colors.accent} gap={0}>
+                    <Text c="#FFFFFF" ff="Georgia" size={25} lh={32} fw="700">e.</Text>
+                  </Block>
+                  <Block gap={0}>
                     <Text c={colors.ink} size={15} fw="bold" lts={0.3}>E-READER</Text>
                     <Text c={colors.muted} size={10} lts={1.2}>READ · LISTEN · FOLLOW</Text>
-                  </View>
-                </Pressable>
-                <View style={styles.topActions}>
+                  </Block>
+                </Block>
+                <Block direction="row" align="center" gap={3}>
                   <SmallButton icon="list" label="Chapters" onPress={() => setShowContents(value => !value)} colors={colors} active={showContents} />
                   <SmallButton icon="text" label="Change text size" onPress={() => setFontIndex(value => (value + 1) % FONT_SIZES.length)} colors={colors} />
                   <SmallButton icon={dark ? 'sun' : 'moon'} label={dark ? 'Light theme' : 'Dark theme'} onPress={() => setDark(value => !value)} colors={colors} />
-                </View>
-              </View>
-            </View>
+                </Block>
+              </Block>
+            </Block>
 
-            <ScrollView ref={scrollRef} style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+            <ScrollArea ref={scrollRef} flex={1} contentProps={{ px: 20, pt: 46, pb: 62, align: 'center' }}>
               {showContents ? (
-                <View style={styles.readingWidth}>
+                <Block w="100%" maw={760} gap={0}>
                   <Text c={colors.accent} size={11} fw="bold" lts={2}>YOUR LIBRARY</Text>
-                  <Text c={colors.ink} style={[styles.pageTitle, { fontFamily: SERIF }]}>The Quiet Atlas</Text>
+                  <Text c={colors.ink} ff={SERIF} size={48} lh={56} fw="600" lts={-1.8} mt={12}>The Quiet Atlas</Text>
                   <Text c={colors.muted} size={15}>A short story made for reading and listening.</Text>
-                  <View style={[styles.bookFeature, { backgroundColor: colors.accent }]}>
-                    <Text style={styles.featureKicker}>NOW READING</Text>
-                    <Text style={[styles.featureTitle, { fontFamily: SERIF }]}>{chapter.title}</Text>
-                    <Text style={styles.featureCopy}>{chapter.subtitle}</Text>
-                    <Text style={styles.featureFooter}>{BOOK.chapters.length} CHAPTERS  ·  WORD-SYNCED AUDIO</Text>
-                  </View>
-                  <Text c={colors.ink} size={16} fw="bold" style={styles.sectionLabel}>Contents</Text>
+                  <Block mih={215} radius={20} p={27} mt={28} justify="space-between" bg={colors.accent} gap={0}>
+                    <Text c="#D6ECE2" size={11} lts={2} fw="700">NOW READING</Text>
+                    <Text c="#FFFFFF" ff={SERIF} size={34} lh={40} fw="600">{chapter.title}</Text>
+                    <Text c="#E6F1EC" size={15}>{chapter.subtitle}</Text>
+                    <Text c="#D6ECE2" size={10} lts={1.4} fw="700" mt={18}>{BOOK.chapters.length} CHAPTERS  ·  WORD-SYNCED AUDIO</Text>
+                  </Block>
+                  <Text c={colors.ink} size={16} fw="bold" mt={35} mb={6}>Contents</Text>
                   {BOOK.chapters.map((item, index) => (
-                    <Pressable
+                    <Block
                       key={item.title}
                       onPress={() => selectChapter(index)}
                       accessibilityRole="button"
                       accessibilityLabel={'Read chapter ' + (index + 1) + ': ' + item.title}
-                      style={[styles.chapterRow, { borderBottomColor: colors.border }]}
+                      direction="row"
+                      align="center"
+                      gap={16}
+                      py={19}
+                      borderBottomWidth={1}
+                      borderBottomColor={colors.border}
                     >
                       <Text c={colors.accent} size={13} fw="bold">{chapterNumber(index)}</Text>
-                      <View style={styles.chapterCopy}>
+                      <Block flex={1} gap={3}>
                         <Text c={colors.ink} size={17} fw="bold">{item.title}</Text>
                         <Text c={colors.muted} size={13}>{item.subtitle}</Text>
-                      </View>
+                      </Block>
                       {bookmarks.includes(index) && <Icon name="bookmark" variant="filled" size={16} color={colors.accent} decorative />}
                       <Icon name="chevron-right" size={18} color={colors.muted} decorative />
-                    </Pressable>
+                    </Block>
                   ))}
-                </View>
+                </Block>
               ) : (
-                <View style={styles.readingWidth}>
-                  <View style={styles.readerMeta}>
+                <Block w="100%" maw={760} gap={0}>
+                  <Block direction="row" align="center" justify="space-between" mb={12} gap={0}>
                     <Text c={colors.accent} size={11} fw="bold" lts={1.8}>
                       THE QUIET ATLAS  /  CHAPTER {chapterNumber(position.chapter)}
                     </Text>
@@ -449,21 +460,29 @@ export default function App() {
                       colors={colors}
                       active={bookmarks.includes(position.chapter)}
                     />
-                  </View>
-                  <Text c={colors.ink} style={[styles.pageTitle, { fontFamily: SERIF, fontSize: compact ? 40 : 48, lineHeight: compact ? 47 : 56 }]}>{chapter.title}</Text>
-                  <Text c={colors.muted} style={[styles.subtitle, { fontFamily: SERIF }]}>{chapter.subtitle}</Text>
-                  <View style={styles.readingStats}>
+                  </Block>
+                  <Text c={colors.ink} ff={SERIF} size={compact ? 40 : 48} lh={compact ? 47 : 56} fw="600" lts={-1.8} mt={12}>{chapter.title}</Text>
+                  <Text c={colors.muted} ff={SERIF} size={20} lh={30} fs="italic" mt={9}>{chapter.subtitle}</Text>
+                  <Block direction="row" align="center" wrap="wrap" gap={10} mt={27} mb={26}>
                     <Text c={colors.muted} size={12}>{minutes} MIN READ</Text>
-                    <View style={[styles.dot, { backgroundColor: colors.muted }]} />
-                    <Text c={colors.muted} size={12}>{Math.round(progress * 100)}% COMPLETE</Text>
-                    <View style={[styles.dot, { backgroundColor: colors.muted }]} />
+                    <Block w={3} h={3} radius={2} bg={colors.muted} gap={0} />
+                    <Text c={colors.muted} size={12}>{percent}% COMPLETE</Text>
+                    <Block w={3} h={3} radius={2} bg={colors.muted} gap={0} />
                     <Text c={colors.muted} size={12}>DEVICE NARRATION</Text>
-                  </View>
-                  <View
-                    style={[styles.paper, { backgroundColor: colors.paper, borderColor: colors.border, paddingHorizontal: compact ? 24 : 34 }]}
+                  </Block>
+                  <Block
+                    borderWidth={1}
+                    borderColor={colors.border}
+                    radius={20}
+                    bg={colors.paper}
+                    px={compact ? 24 : 34}
+                    pt={36}
+                    pb={26}
+                    shadow="sm"
+                    gap={0}
                     onLayout={event => { paperYRef.current = event.nativeEvent.layout.y; }}
                   >
-                    <View style={[styles.paperRule, { backgroundColor: colors.accent }]} />
+                    <Block w={32} h={3} radius={3} mb={29} bg={colors.accent} gap={0} />
                     {chapter.paragraphs.map((paragraph, index) => (
                       <ReaderParagraph
                         key={chapter.title + index}
@@ -477,120 +496,107 @@ export default function App() {
                         onPosition={y => { paragraphYRef.current[index] = y; }}
                       />
                     ))}
-                    <View style={[styles.endMark, { borderTopColor: colors.border }]}>
+                    <Block borderTopWidth={1} borderTopColor={colors.border} pt={22} mt={8} gap={0}>
                       <Text c={colors.accent} size={13} fw="bold" lts={1.1}>END OF CHAPTER {chapterNumber(position.chapter)}</Text>
-                    </View>
-                  </View>
-                  <View style={styles.readerFooter}>
-                    <Pressable
+                    </Block>
+                  </Block>
+                  <Block direction="row" align="center" justify="space-between" mt={24} gap={0}>
+                    <Block
                       onPress={() => selectChapter(Math.max(0, position.chapter - 1))}
-                      disabled={position.chapter === 0}
+                      disabled={firstChapter}
                       accessibilityRole="button"
                       accessibilityLabel="Previous chapter"
-                      style={[styles.chapterNav, { opacity: position.chapter === 0 ? 0.35 : 1 }]}
+                      direction="row"
+                      align="center"
+                      gap={4}
+                      mih={44}
+                      opacity={firstChapter ? 0.35 : 1}
                     >
                       <Icon name="chevron-left" size={18} color={colors.accent} decorative />
                       <Text c={colors.accent} size={13} fw="bold">PREVIOUS</Text>
-                    </Pressable>
-                    <Pressable
+                    </Block>
+                    <Block
                       onPress={() => selectChapter(Math.min(BOOK.chapters.length - 1, position.chapter + 1))}
-                      disabled={position.chapter === BOOK.chapters.length - 1}
+                      disabled={lastChapter}
                       accessibilityRole="button"
                       accessibilityLabel="Next chapter"
-                      style={[styles.chapterNav, { opacity: position.chapter === BOOK.chapters.length - 1 ? 0.35 : 1 }]}
+                      direction="row"
+                      align="center"
+                      gap={4}
+                      mih={44}
+                      opacity={lastChapter ? 0.35 : 1}
                     >
                       <Text c={colors.accent} size={13} fw="bold">NEXT CHAPTER</Text>
                       <Icon name="chevron-right" size={18} color={colors.accent} decorative />
-                    </Pressable>
-                  </View>
-                </View>
+                    </Block>
+                  </Block>
+                </Block>
               )}
-            </ScrollView>
+            </ScrollArea>
 
-            <View style={[styles.player, { backgroundColor: colors.player, borderTopColor: colors.border }]}>
-              <View style={styles.playerInner}>
-                <View style={styles.playerInfo}>
-                  <View style={[styles.audioBadge, { backgroundColor: colors.accentSoft }]}>
+            <Block bg={colors.player} borderTopWidth={1} borderTopColor={colors.border} pt={13} gap={0}>
+              <Block direction="row" align="center" justify="space-between" gap={8} w="100%" maw={1020} alignSelf="center" px={20} pb={13}>
+                <Block flex={1} miw={0} direction="row" align="center" gap={10}>
+                  <Block w={40} h={40} radius={12} align="center" justify="center" bg={colors.accentSoft} gap={0}>
                     <Icon name="headphones" size={19} color={colors.accent} decorative />
-                  </View>
-                  <View style={styles.playerCopy}>
+                  </Block>
+                  <Block flex={1} miw={0} gap={2}>
                     <Text c={colors.accent} size={10} fw="bold" lts={1.4}>{playing ? 'NOW NARRATING' : 'READY TO LISTEN'}</Text>
                     <Text c={colors.ink} size={14} fw="bold" numberOfLines={1}>{chapter.title}</Text>
-                  </View>
-                </View>
-                <View style={styles.transport}>
+                  </Block>
+                </Block>
+                <Block direction="row" align="center" gap={4}>
                   <SmallButton icon="chevron-left" label="Previous paragraph" onPress={() => skipParagraph(-1)} colors={colors} />
-                  <Pressable
+                  <Block
                     onPress={togglePlayback}
+                    pressedStyle={PRESSED}
                     accessibilityRole="button"
                     accessibilityLabel={playing ? 'Pause narration' : 'Play narration'}
-                    style={[styles.playButton, { backgroundColor: colors.accent }]}
+                    w={48}
+                    h={48}
+                    radius={24}
+                    align="center"
+                    justify="center"
+                    bg={colors.accent}
+                    gap={0}
                   >
                     <Icon name={playing ? 'pause' : 'play'} variant="filled" size={22} color={dark ? colors.canvas : '#FFFFFF'} decorative />
-                  </Pressable>
+                  </Block>
                   <SmallButton icon="chevron-right" label="Next paragraph" onPress={() => skipParagraph(1)} colors={colors} />
-                </View>
-                <Pressable
+                </Block>
+                <Block
                   onPress={cycleSpeed}
+                  pressedStyle={PRESSED}
                   accessibilityRole="button"
                   accessibilityLabel={'Narration speed ' + speed + ' times. Change speed'}
-                  style={[styles.speedButton, { borderColor: colors.border }]}
+                  miw={52}
+                  h={36}
+                  px={8}
+                  borderWidth={1}
+                  borderColor={colors.border}
+                  radius={18}
+                  align="center"
+                  justify="center"
+                  gap={0}
                 >
                   <Text c={colors.ink} size={12} fw="bold">{speed}×</Text>
-                </Pressable>
-              </View>
-              <View style={[styles.progressTrack, { backgroundColor: colors.border }]} accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: Math.round(progress * 100) }}>
-                <View style={[styles.progressFill, { backgroundColor: colors.accent, width: (Math.round(progress * 100) + '%') as DimensionValue }]} />
-              </View>
-              {!!speechError && <Text c={colors.accent} size={12} style={styles.playerError}>{speechError}</Text>}
-            </View>
-          </View>
+                </Block>
+              </Block>
+              <Block
+                w="100%"
+                h={3}
+                bg={colors.border}
+                gap={0}
+                accessibilityRole="progressbar"
+                accessibilityValue={{ min: 0, max: 100, now: percent }}
+              >
+                <Block h={3} w={`${percent}%`} bg={colors.accent} gap={0} />
+              </Block>
+              {!!speechError && <Text c={colors.accent} size={12} ta="center" py={5}>{speechError}</Text>}
+            </Block>
+          </Block>
         </SafeArea>
       </PlocksProvider>
     </SafeAreaProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: { flex: 1 },
-  topBar: { borderBottomWidth: 1 },
-  topBarInner: { width: '100%', maxWidth: 1020, alignSelf: 'center', paddingHorizontal: 22, minHeight: 72, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  brand: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  brandMark: { width: 38, height: 38, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  brandLetter: { color: '#FFFFFF', fontFamily: 'Georgia', fontSize: 25, lineHeight: 32, fontWeight: '700' },
-  topActions: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  smallButton: { width: 39, height: 39, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: 20, paddingTop: 46, paddingBottom: 62, alignItems: 'center' },
-  readingWidth: { width: '100%', maxWidth: 760 },
-  readerMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  pageTitle: { fontSize: 48, lineHeight: 56, fontWeight: '600', letterSpacing: -1.8, marginTop: 12 },
-  subtitle: { fontSize: 20, lineHeight: 30, fontStyle: 'italic', marginTop: 9 },
-  readingStats: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginTop: 27, marginBottom: 26 },
-  dot: { width: 3, height: 3, borderRadius: 2 },
-  paper: { borderWidth: 1, borderRadius: 20, paddingHorizontal: 34, paddingTop: 36, paddingBottom: 26, ...Platform.select({ web: { boxShadow: '0 16px 55px rgba(25, 45, 40, 0.06)' }, default: {} }) },
-  paperRule: { width: 32, height: 3, borderRadius: 3, marginBottom: 29 },
-  paragraph: { marginBottom: 24 },
-  endMark: { borderTopWidth: 1, paddingTop: 22, marginTop: 8 },
-  readerFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 24 },
-  chapterNav: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 44 },
-  sectionLabel: { marginTop: 35, marginBottom: 6 },
-  bookFeature: { minHeight: 215, borderRadius: 20, padding: 27, marginTop: 28, justifyContent: 'space-between' },
-  featureKicker: { color: '#D6ECE2', fontSize: 11, letterSpacing: 2, fontWeight: '700' },
-  featureTitle: { color: '#FFFFFF', fontSize: 34, lineHeight: 40, fontWeight: '600' },
-  featureCopy: { color: '#E6F1EC', fontSize: 15 },
-  featureFooter: { color: '#D6ECE2', fontSize: 10, letterSpacing: 1.4, fontWeight: '700', marginTop: 18 },
-  chapterRow: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingVertical: 19, borderBottomWidth: 1 },
-  chapterCopy: { flex: 1, gap: 3 },
-  player: { borderTopWidth: 1, paddingTop: 13 },
-  playerInner: { width: '100%', maxWidth: 1020, alignSelf: 'center', paddingHorizontal: 20, paddingBottom: 13, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  playerInfo: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  playerCopy: { flex: 1, minWidth: 0, gap: 2 },
-  audioBadge: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  transport: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  playButton: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
-  speedButton: { minWidth: 52, height: 36, paddingHorizontal: 8, borderWidth: 1, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  progressTrack: { width: '100%', height: 3 },
-  progressFill: { height: 3 },
-  playerError: { alignSelf: 'center', paddingVertical: 5 },
-});

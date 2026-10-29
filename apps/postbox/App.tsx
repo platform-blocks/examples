@@ -1,6 +1,7 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react';
 import { StatusBar, useWindowDimensions } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as DocumentPicker from 'expo-document-picker';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import {
   TextArea,
@@ -11,12 +12,19 @@ import {
   Block,
   Avatar,
   Button,
+  Chip,
   Dialog,
   Icon,
   IconButton,
+  KeyboardAvoidingArea,
+  Menu,
+  MenuDivider,
+  MenuDropdown,
+  MenuItem,
   PlocksProvider,
   Text,
   useAppShellApi,
+  useToast,
 } from '@plocks/ui';
 
 function NavbarControls({ children }: { children: (actions: ReturnType<typeof useAppShellApi>) => ReactNode }) {
@@ -34,10 +42,14 @@ const C = {
   red: '#EA4335',
 };
 type Folder = 'inbox' | 'starred' | 'sent' | 'drafts' | 'archive' | 'trash';
+type Attachment = { name: string; size?: number };
 type Mail = {
   id: string;
   from: string;
   to: string;
+  cc?: string;
+  bcc?: string;
+  attachments?: Attachment[];
   subject: string;
   body: string;
   time: string;
@@ -135,6 +147,356 @@ const FOLDERS: { id: Folder; label: string; icon: string }[] = [
 ];
 const avatarColor = (name: string) => ['#9874BD', '#6C9CA5', '#CA8C70', '#7DA371'][name.length % 4];
 
+const ME = 'you@example.com';
+const CONTACTS = [
+  { name: 'Maya Chen', email: 'maya@example.com' },
+  { name: 'Alex Rivera', email: 'alex@example.com' },
+  { name: 'Jordan Lee', email: 'jordan@example.com' },
+  { name: 'Sam Patel', email: 'sam@example.com' },
+  { name: 'Studio North', email: 'hello@studionorth.example' },
+  { name: 'Local Library', email: 'desk@library.example' },
+];
+type Field = 'to' | 'cc' | 'bcc';
+// The plocks TextInput type (the app and the library resolve separate react-native copies).
+type InputRef = ComponentProps<typeof Input>['inputRef'];
+type TextInput = NonNullable<InputRef> extends infer R ? (R extends { current: infer T } ? NonNullable<T> : never) : never;
+type Draft = {
+  id?: string;
+  to: string[];
+  cc: string[];
+  bcc: string[];
+  subject: string;
+  body: string;
+  attachments: Attachment[];
+};
+const EMPTY_DRAFT: Draft = { to: [], cc: [], bcc: [], subject: '', body: '', attachments: [] };
+const splitList = (value?: string) => (value ?? '').split(',').map((item) => item.trim()).filter(Boolean);
+const contactFor = (value: string) =>
+  CONTACTS.find((item) => item.email === value.toLowerCase() || item.name.toLowerCase() === value.toLowerCase());
+const labelFor = (value: string) => contactFor(value)?.name ?? value;
+const isAddress = (value: string) => !!contactFor(value) || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+const hasContent = (draft: Draft) =>
+  draft.to.length + draft.cc.length + draft.bcc.length + draft.attachments.length > 0 ||
+  !!draft.subject.trim() ||
+  !!draft.body.trim();
+const fileSize = (size?: number) =>
+  size == null ? '' : size < 1024 * 1024 ? ` · ${Math.max(1, Math.round(size / 1024))} KB` : ` · ${(size / 1048576).toFixed(1)} MB`;
+
+function RecipientRow({
+  label,
+  values,
+  text,
+  onValues,
+  onText,
+  inputRef,
+  children,
+}: {
+  label: string;
+  values: string[];
+  text: string;
+  onValues: (change: (old: string[]) => string[]) => void;
+  onText: (next: string) => void;
+  inputRef?: InputRef;
+  children?: ReactNode;
+}) {
+  const query = text.trim().toLowerCase();
+  const suggestions = query
+    ? CONTACTS.filter(
+        (item) =>
+          !values.includes(item.name) &&
+          (item.name.toLowerCase().includes(query) || item.email.includes(query)),
+      ).slice(0, 5)
+    : [];
+  const add = (value: string) => {
+    const next = value.trim();
+    if (next) onValues((old) => (old.includes(next) ? old : [...old, next]));
+    onText('');
+  };
+  return (
+    <Block gap={0} zIndex={suggestions.length ? 10 : 0}>
+      <Block
+        direction="row"
+        align="flex-start"
+        gap={12}
+        px={16}
+        mih={52}
+        borderBottomWidth={1}
+        borderBottomColor={C.line}
+      >
+        <Text c={C.muted} size={15} w={44} mt={16}>
+          {label}
+        </Text>
+        <Block flex={1} miw={0} direction="row" wrap="wrap" align="center" gap={6} py={8}>
+          {values.map((value) => (
+            <Chip
+              key={value}
+              size="md"
+              variant={isAddress(value) ? 'surface' : 'light'}
+              color={isAddress(value) ? undefined : 'error'}
+              startSection={
+                <Avatar size="xs" fallback={labelFor(value).slice(0, 1).toUpperCase()} bg={avatarColor(labelFor(value))} textColor={C.white} />
+              }
+              labelProps={{ c: isAddress(value) ? C.ink : C.red }}
+              onRemove={() => onValues((old) => old.filter((item) => item !== value))}
+              removeButtonLabel={`Remove ${labelFor(value)}`}
+            >
+              {labelFor(value)}
+            </Chip>
+          ))}
+          <Input
+            variant="unstyled"
+            inputRef={inputRef}
+            value={text}
+            onChangeText={(next) => (/[,;]$/.test(next) ? add(next.slice(0, -1)) : onText(next))}
+            onEnter={() => add(suggestions[0]?.name ?? text)}
+            textInputProps={{
+              onKeyPress: (event) => {
+                if (event.nativeEvent.key === 'Backspace' && !text) onValues((old) => old.slice(0, -1));
+              },
+            }}
+            accessibilityLabel={label}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="email-address"
+            returnKeyType="next"
+            mb={0}
+            flex={1}
+            miw={80}
+            inputColor={C.ink}
+            inputFontSize={15}
+          />
+        </Block>
+        {children}
+      </Block>
+      {suggestions.length > 0 && (
+        <Block gap={0} position="absolute" top="100%" left={0} right={0} bg={C.white} shadow="md" py={6}>
+          {suggestions.map((item) => (
+            <Block
+              key={item.email}
+              onPress={() => add(item.name)}
+              accessibilityRole="button"
+              accessibilityLabel={`Add ${item.name}`}
+              direction="row"
+              align="center"
+              gap={14}
+              px={16}
+              py={9}
+            >
+              <Avatar size="md" fallback={item.name.slice(0, 2).toUpperCase()} bg={avatarColor(item.name)} textColor={C.white} />
+              <Block gap={1} flex={1} miw={0}>
+                <Text c={C.ink} size={14} fw="medium" numberOfLines={1}>
+                  {item.name}
+                </Text>
+                <Text c={C.muted} size={12} numberOfLines={1}>
+                  {item.email}
+                </Text>
+              </Block>
+            </Block>
+          ))}
+        </Block>
+      )}
+    </Block>
+  );
+}
+
+function ComposeScreen({
+  initial,
+  onClose,
+  onSend,
+  onDiscard,
+}: {
+  initial: Draft;
+  onClose: (draft: Draft) => void;
+  onSend: (draft: Draft) => void;
+  onDiscard: () => void;
+}) {
+  const { width, height } = useWindowDimensions();
+  const wide = width >= 768;
+  const [draft, setDraft] = useState<Draft>(initial);
+  const [typed, setTyped] = useState<Record<Field, string>>({ to: '', cc: '', bcc: '' });
+  const [showCc, setShowCc] = useState(initial.cc.length + initial.bcc.length > 0);
+  const toRef = useRef<TextInput>(null);
+  const bodyRef = useRef<TextInput>(null);
+  // Text still in a recipient field counts as a recipient, as in Gmail.
+  const current = (): Draft => ({
+    ...draft,
+    to: typed.to.trim() ? [...draft.to, typed.to.trim()] : draft.to,
+    cc: typed.cc.trim() ? [...draft.cc, typed.cc.trim()] : draft.cc,
+    bcc: typed.bcc.trim() ? [...draft.bcc, typed.bcc.trim()] : draft.bcc,
+  });
+  const canSend = current().to.length > 0 && !!draft.body.trim();
+  const update = (patch: Partial<Draft>) => setDraft((old) => ({ ...old, ...patch }));
+  const close = () => onClose(current());
+  const send = () => canSend && onSend(current());
+  async function attach() {
+    const result = await DocumentPicker.getDocumentAsync({ multiple: true, copyToCacheDirectory: false });
+    if (result.canceled) return;
+    setDraft((old) => ({
+      ...old,
+      attachments: [...old.attachments, ...result.assets.map((item) => ({ name: item.name, size: item.size }))],
+    }));
+  }
+  const recipientRow = (field: Field, label: string, children?: ReactNode) => (
+    <RecipientRow
+      label={label}
+      values={draft[field]}
+      text={typed[field]}
+      onValues={(change) => setDraft((old) => ({ ...old, [field]: change(old[field]) }))}
+      onText={(next) => setTyped((old) => ({ ...old, [field]: next }))}
+      inputRef={field === 'to' ? toRef : undefined}
+    >
+      {children}
+    </RecipientRow>
+  );
+  const overflow = (
+    <Menu position="bottom-end">
+      <IconButton icon="dots-vertical" variant="ghost" iconColor={C.muted} accessibilityLabel="More options" />
+      <MenuDropdown>
+        <MenuItem onPress={() => setShowCc((old) => !old)}>{showCc ? 'Hide Cc/Bcc' : 'Add Cc/Bcc'}</MenuItem>
+        <MenuItem onPress={close}>Save draft</MenuItem>
+        <MenuDivider />
+        <MenuItem color="error" onPress={onDiscard}>
+          Discard
+        </MenuItem>
+      </MenuDropdown>
+    </Menu>
+  );
+
+  const form = (
+    <>
+      <Block direction="row" align="center" gap={12} px={16} h={52} borderBottomWidth={1} borderBottomColor={C.line}>
+        <Text c={C.muted} size={15} w={44}>
+          From
+        </Text>
+        <Text c={C.ink} size={15} flex={1} numberOfLines={1}>
+          {ME}
+        </Text>
+      </Block>
+      {recipientRow(
+        'to',
+        'To',
+        wide ? (
+          !showCc && (
+            <Block gap={0} onPress={() => setShowCc(true)} accessibilityRole="button" accessibilityLabel="Add Cc and Bcc" mt={16}>
+              <Text c={C.muted} size={14}>
+                Cc  Bcc
+              </Text>
+            </Block>
+          )
+        ) : (
+          <IconButton
+            icon={showCc ? 'chevronUp' : 'chevronDown'}
+            variant="ghost"
+            iconColor={C.muted}
+            accessibilityLabel={showCc ? 'Hide Cc and Bcc' : 'Show Cc and Bcc'}
+            onPress={() => setShowCc((old) => !old)}
+            mt={8}
+          />
+        ),
+      )}
+      {showCc && recipientRow('cc', 'Cc')}
+      {showCc && recipientRow('bcc', 'Bcc')}
+      <Block direction="row" align="center" px={16} h={52} borderBottomWidth={1} borderBottomColor={C.line}>
+        <Input
+          variant="unstyled"
+          value={draft.subject}
+          onChangeText={(subject) => update({ subject })}
+          onEnter={() => bodyRef.current?.focus()}
+          placeholder="Subject"
+          placeholderTextColor={C.muted}
+          accessibilityLabel="Subject"
+          returnKeyType="next"
+          mb={0}
+          flex={1}
+          inputColor={C.ink}
+          inputFontSize={15}
+        />
+      </Block>
+      <Block gap={0} flex={1} px={16} pt={14} pb={8}>
+        <TextArea
+          ref={bodyRef}
+          variant="unstyled"
+          value={draft.body}
+          onChangeText={(body) => update({ body })}
+          placeholder="Compose email"
+          placeholderTextColor={C.muted}
+          accessibilityLabel="Message body"
+          flex={1}
+          size="lg"
+          mb={0}
+        />
+      </Block>
+      {draft.attachments.length > 0 && (
+        <Block direction="row" wrap="wrap" gap={8} px={16} py={10}>
+          {draft.attachments.map((item, index) => (
+            <Chip
+              key={`${item.name}-${index}`}
+              size="md"
+              variant="surface"
+              startSection={<Icon name="file" color={C.red} size={16} />}
+              labelProps={{ c: C.ink }}
+              onRemove={() => update({ attachments: draft.attachments.filter((_, other) => other !== index) })}
+              removeButtonLabel={`Remove ${item.name}`}
+            >
+              {`${item.name}${fileSize(item.size)}`}
+            </Chip>
+          ))}
+        </Block>
+      )}
+    </>
+  );
+
+  return (
+    <Dialog
+      opened
+      variant={wide ? 'modal' : 'fullscreen'}
+      w={wide ? Math.min(width - 64, 1120) : undefined}
+      radius={wide ? 16 : undefined}
+      p={0}
+      accessibilityLabel={draft.subject.trim() || 'New message'}
+      autoFocus={initial.to.length ? bodyRef : toRef}
+      onClose={close}
+    >
+      {wide ? (
+        <Block gap={0} h={height - 64} bg={C.white}>
+          <Block direction="row" align="center" gap={4} bg="#F2F6FC" pl={18} pr={6} h={44}>
+            <Text c={C.ink} fw="medium" size={14} flex={1} numberOfLines={1}>
+              {draft.subject.trim() || 'New message'}
+            </Text>
+            <IconButton icon="x" variant="ghost" iconColor={C.ink} accessibilityLabel="Save draft and close" onPress={close} />
+          </Block>
+          {form}
+          <Block direction="row" align="center" gap={6} px={16} py={12}>
+            <Button title="Send" color={C.blue} radius="xl" disabled={!canSend} onPress={send} mr={6} />
+            <IconButton icon="paperclip" variant="ghost" iconColor={C.muted} accessibilityLabel="Attach files" onPress={attach} />
+            <Block gap={0} flex={1} />
+            {overflow}
+            <IconButton icon="trash" variant="ghost" iconColor={C.muted} accessibilityLabel="Discard draft" onPress={onDiscard} />
+          </Block>
+        </Block>
+      ) : (
+        <KeyboardAvoidingArea gap={0} flex={1} bg={C.white}>
+          <Block direction="row" align="center" gap={2} px={4} h={56}>
+            <IconButton icon="arrowLeft" variant="ghost" iconColor={C.ink} accessibilityLabel="Save draft and close" onPress={close} />
+            <Block gap={0} flex={1} />
+            <IconButton icon="paperclip" variant="ghost" iconColor={C.ink} accessibilityLabel="Attach files" onPress={attach} />
+            <IconButton
+              icon="send"
+              variant="ghost"
+              iconColor={canSend ? C.blue : '#B4BAC2'}
+              accessibilityLabel="Send"
+              disabled={!canSend}
+              onPress={send}
+            />
+            {overflow}
+          </Block>
+          {form}
+        </KeyboardAvoidingArea>
+      )}
+    </Dialog>
+  );
+}
+
 function PostboxScreen() {
   const { width } = useWindowDimensions();
   const wide = width >= 768;
@@ -142,10 +504,8 @@ function PostboxScreen() {
   const [messages, setMessages] = useState<Mail[]>(INITIAL);
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<string | null>(null);
-  const [compose, setCompose] = useState(false);
-  const [to, setTo] = useState('');
-  const [subject, setSubject] = useState('');
-  const [body, setBody] = useState('');
+  const [compose, setCompose] = useState<Draft | null>(null);
+  const toast = useToast();
   const [ready, setReady] = useState(false);
   const active = messages.find((item) => item.id === selected);
   const unread = messages.filter((item) => item.folder === 'inbox' && !item.read).length;
@@ -178,6 +538,8 @@ function PostboxScreen() {
     setSelected(null);
   };
   const openMessage = (id: string) => {
+    const mail = messages.find((item) => item.id === id);
+    if (mail?.folder === 'drafts') return openDraft(mail);
     setSelected(id);
     setMessages((old) => old.map((item) => (item.id === id ? { ...item, read: true } : item)));
   };
@@ -187,52 +549,66 @@ function PostboxScreen() {
     setMessages((old) => old.map((item) => (item.id === id ? { ...item, folder: next } : item)));
     setSelected(null);
   };
+  const notify = (message: string) =>
+    toast.show({ message, variant: 'filled', color: '#303134', position: wide ? 'bottom-left' : 'bottom-center', autoHide: 3500 });
   function startCompose(reply?: Mail) {
-    setTo(reply?.from ?? '');
-    setSubject(reply ? `Re: ${reply.subject.replace(/^Re: /, '')}` : '');
-    setBody('');
-    setCompose(true);
+    setCompose({
+      ...EMPTY_DRAFT,
+      to: reply ? [reply.from] : [],
+      subject: reply ? `Re: ${reply.subject.replace(/^Re: /, '')}` : '',
+    });
   }
-  function saveDraft() {
-    if (to.trim() || subject.trim() || body.trim())
-      setMessages((old) => [
-        {
-          id: `draft-${Date.now()}`,
-          from: 'you@example.com',
-          to: to.trim(),
-          subject: subject.trim() || '(no subject)',
-          body: body.trim(),
-          time: 'Draft',
-          folder: 'drafts',
-          starred: false,
-          read: true,
-        },
-        ...old,
-      ]);
-    setCompose(false);
+  function openDraft(mail: Mail) {
+    setCompose({
+      id: mail.id,
+      to: splitList(mail.to),
+      cc: splitList(mail.cc),
+      bcc: splitList(mail.bcc),
+      subject: mail.subject === '(no subject)' ? '' : mail.subject,
+      body: mail.body,
+      attachments: mail.attachments ?? [],
+    });
   }
-  function send() {
-    if (!to.trim() || !body.trim()) return;
+  const toMail = (draft: Draft, id: string, folder: Folder, time: string): Mail => ({
+    id,
+    from: ME,
+    to: draft.to.join(', '),
+    cc: draft.cc.join(', '),
+    bcc: draft.bcc.join(', '),
+    attachments: draft.attachments,
+    subject: draft.subject.trim() || '(no subject)',
+    body: draft.body.trim(),
+    time,
+    folder,
+    starred: false,
+    read: true,
+  });
+  // Closing keeps whatever was written as a draft, as Gmail does.
+  function saveDraft(draft: Draft) {
+    if (hasContent(draft)) {
+      const mail = toMail(draft, draft.id ?? `draft-${Date.now()}`, 'drafts', 'Draft');
+      setMessages((old) => [mail, ...old.filter((item) => item.id !== mail.id)]);
+      notify('Draft saved');
+    } else if (draft.id) {
+      setMessages((old) => old.filter((item) => item.id !== draft.id));
+    }
+    setCompose(null);
+  }
+  function discardDraft() {
+    const id = compose?.id;
+    if (id) setMessages((old) => old.filter((item) => item.id !== id));
+    setCompose(null);
+    notify('Draft discarded');
+  }
+  function send(draft: Draft) {
     setMessages((old) => [
-      {
-        id: `sent-${Date.now()}`,
-        from: 'you@example.com',
-        to: to.trim(),
-        subject: subject.trim() || '(no subject)',
-        body: body.trim(),
-        time: 'Just now',
-        folder: 'sent',
-        starred: false,
-        read: true,
-      },
-      ...old,
+      toMail(draft, `sent-${Date.now()}`, 'sent', 'Just now'),
+      ...old.filter((item) => item.id !== draft.id),
     ]);
-    setCompose(false);
-    setTo('');
-    setSubject('');
-    setBody('');
+    setCompose(null);
     setFolder('sent');
     setSelected(null);
+    notify('Message sent');
   }
   const sidebar = (closeNavbar: () => void) => (
     <Block flex={1} bg={C.bg} p={12} gap={8}>
@@ -242,7 +618,7 @@ function PostboxScreen() {
         textColor={C.ink}
         radius="lg"
         onPress={() => {
-          closeNavbar();
+          if (!wide) closeNavbar();
           startCompose();
         }}
       />
@@ -252,7 +628,7 @@ function PostboxScreen() {
           key={item.id}
           onPress={() => {
             changeFolder(item.id);
-            closeNavbar();
+            if (!wide) closeNavbar();
           }}
           accessibilityRole="button"
           accessibilityLabel={`Open ${item.label}`}
@@ -503,7 +879,8 @@ function PostboxScreen() {
                             {active.from}
                           </Text>
                           <Text c={C.muted} size={11}>
-                            to {active.to} · {active.time}
+                            to {active.to}
+                            {active.cc ? `, cc ${active.cc}` : ''} · {active.time}
                           </Text>
                         </Block>
                         <IconButton
@@ -517,6 +894,21 @@ function PostboxScreen() {
                       <Text c={C.ink} size={15} lh={25} mt={30} mb={30}>
                         {active.body}
                       </Text>
+                      {!!active.attachments?.length && (
+                        <Block direction="row" wrap="wrap" gap={8} mt={-10} mb={30}>
+                          {active.attachments.map((item, index) => (
+                            <Chip
+                              key={`${item.name}-${index}`}
+                              size="md"
+                              variant="surface"
+                              startSection={<Icon name="file" color={C.red} size={16} />}
+                              labelProps={{ c: C.ink }}
+                            >
+                              {`${item.name}${fileSize(item.size)}`}
+                            </Chip>
+                          ))}
+                        </Block>
+                      )}
                       {active.folder !== 'sent' && (
                         <Block gap={0} alignSelf="flex-start">
                           <Button
@@ -543,46 +935,7 @@ function PostboxScreen() {
           </Block>
         </AppShell.Main>
       </AppShell>
-      {compose && (
-        <Dialog opened accessibilityLabel="New message" onClose={saveDraft}>
-          <Block gap={0}>
-            <Block gap={0} bg="#EEF2F8" px={17} h={45} direction="row" align="center" justify="space-between">
-              <Text c={C.ink} fw="bold">
-                New message
-              </Text>
-              <IconButton
-                icon="x"
-                variant="ghost"
-                iconColor={C.ink}
-                accessibilityLabel="Save draft and close"
-                onPress={saveDraft}
-              />
-            </Block>
-            <Input
-              variant="outline"
-              value={to}
-              onChangeText={setTo}
-              placeholder="To"
-              autoCapitalize="none"
-              keyboardType="email-address"
-              mb={0}
-              inputColor={C.ink}
-            />
-            <Input
-              variant="outline"
-              value={subject}
-              onChangeText={setSubject}
-              placeholder="Subject"
-              mb={0}
-              inputColor={C.ink}
-            />
-            <TextArea variant="outline" value={body} onChangeText={setBody} placeholder="Write your message" mb={0} />
-            <Block gap={0} p={12} alignSelf="flex-start">
-              <Button title="Send demo message" color={C.blue} disabled={!to.trim() || !body.trim()} onPress={send} />
-            </Block>
-          </Block>
-        </Dialog>
-      )}
+      {compose && <ComposeScreen initial={compose} onClose={saveDraft} onSend={send} onDiscard={discardDraft} />}
     </SafeArea>
   );
 }
